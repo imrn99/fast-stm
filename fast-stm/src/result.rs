@@ -1,4 +1,3 @@
-
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 pub enum StmError {
     /// The call failed, because a variable, the computation

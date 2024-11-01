@@ -21,7 +21,9 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@nightly
       - name: Generate documentation
+        run: 
         run: |
+          cargo +nightly doc --all --all-features --no-deps
           sudo chmod +x docs/build.sh
           sudo ./docs/build.sh
       - name: Deploy Docs
