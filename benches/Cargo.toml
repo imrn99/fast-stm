@@ -11,6 +11,24 @@ keywords.workspace = true
 description.workspace = true
 authors = ["Isaie Muron <github@imrn.fr>"]
 
-[dependencies]
-parking_lot = { workspace = true, default-features = false }
+[dev-dependencies]
+fast-stm.workspace = true
+atomic.workspace = true
+bytemuck.workspace = true
+criterion.workspace = true
+
+[[bench]]
+name = "init-time"
+path = "benches/init.rs"
+harness = false
+
+[[bench]]
+name = "load-time"
+path = "benches/load.rs"
+harness = false
+
+[[bench]]
+name = "store-time"
+path = "benches/store.rs"
+harness = false
 

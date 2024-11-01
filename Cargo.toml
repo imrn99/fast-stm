@@ -29,3 +29,8 @@ fast-stm = { version = "0.5.0", path = "./fast-stm" }
 
 # external
 parking_lot = { version = "0.5.0", default-features = false }
+
+# benchmarks
+atomic = "0.6.0"
+bytemuck = "1.19.0"
+criterion = "0.5.1"
