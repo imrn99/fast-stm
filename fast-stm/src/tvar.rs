@@ -6,14 +6,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::sync::{Arc, Weak};
 use parking_lot::{Mutex, RwLock};
+use std::any::Any;
+use std::cmp;
+use std::fmt::{self, Debug};
+use std::marker::PhantomData;
 use std::mem;
 use std::sync::atomic::{self, AtomicUsize};
-use std::cmp;
-use std::any::Any;
-use std::marker::PhantomData;
-use std::fmt::{Debug, self};
+use std::sync::{Arc, Weak};
 
 use super::result::*;
 use super::transaction::control_block::ControlBlock;
@@ -52,11 +52,11 @@ pub struct VarControlBlock {
     pub value: RwLock<Arc<dyn Any + Send + Sync>>,
 }
 
-
 impl VarControlBlock {
     /// create a new empty `VarControlBlock`
     pub fn new<T>(val: T) -> Arc<VarControlBlock>
-        where T: Any + Sync + Send
+    where
+        T: Any + Sync + Send,
     {
         let ctrl = VarControlBlock {
             waiting_threads: Mutex::new(Vec::new()),
@@ -76,8 +76,7 @@ impl VarControlBlock {
         };
 
         // Take all, that are still alive.
-        let threads = threads.iter()
-            .filter_map(Weak::upgrade);
+        let threads = threads.iter().filter_map(Weak::upgrade);
 
         // Release all the semaphores to start the thread.
         for thread in threads {
@@ -122,7 +121,6 @@ impl VarControlBlock {
     }
 }
 
-
 // Implement some operators so that VarControlBlocks can be sorted.
 
 impl PartialEq for VarControlBlock {
@@ -145,13 +143,11 @@ impl PartialOrd for VarControlBlock {
     }
 }
 
-
-
 /// A variable that can be used in a STM-Block
 #[derive(Clone)]
 pub struct TVar<T> {
     /// The control block is the inner of the variable.
-    /// 
+    ///
     /// The rest of `TVar` is just the typesafe interface.
     control_block: Arc<VarControlBlock>,
 
@@ -161,7 +157,8 @@ pub struct TVar<T> {
 }
 
 impl<T> TVar<T>
-    where T: Any + Sync + Send + Clone
+where
+    T: Any + Sync + Send + Clone,
 {
     /// Create a new `TVar`.
     pub fn new(val: T) -> TVar<T> {
@@ -173,10 +170,10 @@ impl<T> TVar<T>
 
     /// `read_atomic` reads a value atomically, without starting a transaction.
     ///
-    /// It is semantically equivalent to 
+    /// It is semantically equivalent to
     ///
     /// ```
-    /// # use stm_core::*;
+    /// # use fast_stm::*;
     ///
     /// let var = TVar::new(0);
     /// atomically(|trans| var.read(trans));
@@ -200,10 +197,7 @@ impl<T> TVar<T>
     /// some cases, because `read_atomic` clones the
     /// inner value, which may be expensive.
     pub fn read_ref_atomic(&self) -> Arc<dyn Any + Send + Sync> {
-        self.control_block
-            .value
-            .read()
-            .clone()
+        self.control_block.value.read().clone()
     }
 
     /// The normal way to access a var.
@@ -225,31 +219,32 @@ impl<T> TVar<T>
     /// Modify the content of a `TVar` with the function f.
     ///
     /// ```
-    /// # use stm_core::*;
+    /// # use fast_stm::*;
     ///
     ///
     /// let var = TVar::new(21);
-    /// atomically(|trans| 
+    /// atomically(|trans|
     ///     var.modify(trans, |x| x*2)
     /// );
     ///
     /// assert_eq!(var.read_atomic(), 42);
     /// ```
-    pub fn modify<F>(&self, transaction: &mut Transaction, f: F) -> StmResult<()> 
-    where F: FnOnce(T) -> T
+    pub fn modify<F>(&self, transaction: &mut Transaction, f: F) -> StmResult<()>
+    where
+        F: FnOnce(T) -> T,
     {
         let old = self.read(transaction)?;
         self.write(transaction, f(old))
     }
-    
+
     /// Replaces the value of a `TVar` with a new one, returning
     /// the old one.
     ///
     /// ```
-    /// # use stm_core::*;
+    /// # use fast_stm::*;
     ///
     /// let var = TVar::new(0);
-    /// let x = atomically(|trans| 
+    /// let x = atomically(|trans|
     ///     var.replace(trans, 42)
     /// );
     ///
@@ -266,7 +261,7 @@ impl<T> TVar<T>
     pub fn ref_eq(this: &TVar<T>, other: &TVar<T>) -> bool {
         Arc::ptr_eq(&this.control_block, &other.control_block)
     }
-    
+
     /// Access the control block of the var.
     ///
     /// Internal use only!
@@ -279,25 +274,22 @@ impl<T> TVar<T>
 ///
 /// Note that this function does not print the state atomically.
 /// If another thread modifies the datastructure at the same time, it may print an inconsistent state.
-/// If you need an accurate view, that reflects current thread-local state, you can implement it easily yourself with 
+/// If you need an accurate view, that reflects current thread-local state, you can implement it easily yourself with
 /// atomically.
 ///
 /// Running `atomically` inside a running transaction panics. Therefore `fmt` uses
 /// prints the state.
 impl<T> Debug for TVar<T>
-    where T: Any + Sync + Send + Clone,
-          T: Debug,
+where
+    T: Any + Sync + Send + Clone,
+    T: Debug,
 {
     #[inline(never)]
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         let x = self.read_atomic();
-        f.debug_struct("TVar")
-            .field("value", &x)
-            .finish()
+        f.debug_struct("TVar").field("value", &x).finish()
     }
 }
-
-
 
 #[test]
 // Test if creating and reading a TVar works.
@@ -306,6 +298,5 @@ fn test_read_atomic() {
 
     assert_eq!(42, var.read_atomic());
 }
-
 
 // More tests are in lib.rs.

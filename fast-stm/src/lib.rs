@@ -48,7 +48,7 @@
 //!
 //!
 //! ```
-//! # use stm_core::atomically;
+//! # use fast_stm::atomically;
 //! atomically(|trans| {
 //!     // some action
 //!     // return value as `Result`, for example
@@ -64,7 +64,7 @@
 //! Do not handle the error yourself.
 //!
 //! ```
-//! # use stm_core::{atomically, TVar};
+//! # use fast_stm::{atomically, TVar};
 //! let var = TVar::new(0);
 //!
 //! let x = atomically(|trans| {
@@ -141,7 +141,7 @@ pub use tvar::TVar;
 /// # Examples
 ///
 /// ```no_run
-/// # use stm_core::*;
+/// # use fast_stm::*;
 /// let infinite_retry: i32 = atomically(|_| retry());
 /// ```
 pub fn retry<T>() -> StmResult<T> {
@@ -165,7 +165,7 @@ where
 /// # Example
 ///
 /// ```
-/// # use stm_core::*;
+/// # use fast_stm::*;
 /// let x = TVar::new(Some(42));
 ///
 /// atomically(|tx| {
@@ -188,7 +188,7 @@ pub fn unwrap_or_retry<T>(option: Option<T>) -> StmResult<T> {
 /// # Example
 ///
 /// ```
-/// # use stm_core::*;
+/// # use fast_stm::*;
 /// let var = TVar::new(42);
 ///
 /// let x = atomically(|tx| {
@@ -219,7 +219,7 @@ pub fn guard(cond: bool) -> StmResult<()> {
 /// # Example
 ///
 /// ```
-/// # use stm_core::*;
+/// # use fast_stm::*;
 /// let x:Option<i32> = atomically(|tx|
 ///     optionally(tx, |_| retry()));
 /// assert_eq!(x, None);

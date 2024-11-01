@@ -6,8 +6,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use std::thread::{self, Thread};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::thread::{self, Thread};
 
 #[cfg(test)]
 use super::super::test::{terminates, terminates_async};
@@ -17,20 +17,18 @@ use super::super::test::{terminates, terminates_async};
 /// STM blocks on all read variables if retry was called.
 /// This control block is used to let the vars inform the STM instance.
 ///
-/// Be careful when using this directly, 
+/// Be careful when using this directly,
 /// because you can easily create deadlocks.
 pub struct ControlBlock {
     /// This is the handle to the thread, that waits on the control block.
     thread: Thread,
 
-    /// Atomic bool stores if the thread has been blocked yet. 
+    /// Atomic bool stores if the thread has been blocked yet.
     /// Make sure, that park is repeated if no change has happened.
     blocked: AtomicBool,
 }
 
 impl ControlBlock {
-    #[cfg_attr(feature = "cargo-clippy", allow(new_without_default_derive))]
-
     /// Create a new StmControlBlock.
     pub fn new() -> ControlBlock {
         ControlBlock {
@@ -61,7 +59,6 @@ impl ControlBlock {
         }
     }
 }
-
 
 // TESTS
 #[cfg(test)]
@@ -104,7 +101,6 @@ mod test {
         assert!(terminates(50, move || ctrl.wait()));
     }
 
-
     /// Perform a wakeup from another thread.
     #[test]
     fn wait_threaded_wakeup() {
@@ -112,9 +108,7 @@ mod test {
 
         let ctrl = Arc::new(ControlBlock::new());
         let ctrl2 = ctrl.clone();
-        let terminated = terminates_async(500,
-                                    move || ctrl.wait(),
-                                    move || ctrl2.set_changed());
+        let terminated = terminates_async(500, move || ctrl.wait(), move || ctrl2.set_changed());
 
         assert!(terminated);
     }
