@@ -28,4 +28,4 @@ authors = [
 fast-stm = { version = "0.5.0", path = "./fast-stm" }
 
 # external
-parking_lot = "0.5.0"
+parking_lot = { version = "0.5.0", default-features = false }

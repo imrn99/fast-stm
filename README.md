@@ -1,8 +1,6 @@
 # Fast Software Transactional Memory
 
----
-
-This crate is a fork of Marthog's original [`stm` crate](https://github.com/imrn99/fast-stm).
+This crate is a fork of Marthog's original [`stm` crate](https://github.com/Marthog/rust-stm).
 
 There are two reasons for this fork to exist:
 
