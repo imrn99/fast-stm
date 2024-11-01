@@ -1,4 +1,18 @@
-# Software Transactional Memory [![Build Status](https://travis-ci.org/Marthog/rust-stm.svg?branch=master)](https://travis-ci.org/Marthog/rust-stm)
+# Fast Software Transactional Memory
+
+---
+
+This crate is a fork of Marthog's original [`stm` crate](https://github.com/imrn99/fast-stm).
+
+There are two reasons for this fork to exist:
+
+1. the original crate hasn't been updated in years
+2. there (probably) is some work to do on this crate performance-wise
+
+That being said, the original API should not see significant changes. Below is the original crate's README.
+
+---
+
 
 This library implements [software transactional memory](https://en.wikipedia.org/wiki/Software_transactional_memory),
 often abbreviated with STM.
@@ -71,20 +85,20 @@ that Rust considers safe. Still there are multiple rules that
 you should obey when dealing with software transactional memory:
 
 * Don't run code with side effects, especially no IO-code,
-because stm repeats the computation when it detects inconsistent state.
-Return a closure if you have to.
+  because stm repeats the computation when it detects inconsistent state.
+  Return a closure if you have to.
 * Don't handle the error types yourself, unless you absolutely know what you
-are doing. Use `Transaction::or`, to combine alternative paths. Always call `try!` or
-`?` and never ignore a `StmResult`.
+  are doing. Use `Transaction::or`, to combine alternative paths. Always call `try!` or
+  `?` and never ignore a `StmResult`.
 * Don't run `atomically` inside of another. `atomically` is designed to have side effects
-and will therefore break stm's assumptions. Nested calls are detected at runtime and
-handled with panic.
-When you use STM in the inner of a function, then
-express it in the public interface, by taking `&mut Transaction` as parameter and 
-returning `StmResult<T>`. Callers can safely compose it into
-larger blocks.
+  and will therefore break stm's assumptions. Nested calls are detected at runtime and
+  handled with panic.
+  When you use STM in the inner of a function, then
+  express it in the public interface, by taking `&mut Transaction` as parameter and 
+  returning `StmResult<T>`. Callers can safely compose it into
+  larger blocks.
 * Don't mix locks and transactions. Your code will easily deadlock or slow
-down unpredictably.
+  down unpredictably.
 * Don't use inner mutability to change the content of a `TVar`.
 
 # Speed

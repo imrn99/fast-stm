@@ -1,0 +1,1 @@
+//! `fast-stm` benchmarks
