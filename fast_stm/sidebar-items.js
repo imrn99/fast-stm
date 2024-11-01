@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["StmError","TransactionControl"],"fn":["atomically","guard","optionally","retry","unwrap_or_retry"],"struct":["TVar","Transaction"],"type":["StmResult"]};
