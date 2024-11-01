@@ -15,7 +15,7 @@
 //! for more info. Especially the chapter about
 //! Performance is also important for using STM in rust.
 //!
-//! With locks the sequential composition of two 
+//! With locks the sequential composition of two
 //! two threadsafe actions is no longer threadsafe because
 //! other threads may interfer in between of these actions.
 //! Applying a third lock to protect both may lead to common sources of errors
@@ -39,7 +39,7 @@
 //! Mutexes and other blocking mechanisms are especially dangerous, because they can
 //! interfere with the internal locking scheme of the transaction and therefore
 //! cause deadlocks.
-//! 
+//!
 //! Note, that Transaction-safety does *not* mean safety in the rust sense, but is a
 //! subset of allowed behavior. Even if code is not transaction-safe, no segmentation
 //! faults will happen.
@@ -85,24 +85,24 @@
 //! you should obey when dealing with software transactional memory.
 //!
 //! * Don't run code with side effects, especially no IO-code.
-//! Transactions repeat in failure cases. Using IO would repeat this IO-code.
-//! Return a closure if you have to.
+//!   Transactions repeat in failure cases. Using IO would repeat this IO-code.
+//!   Return a closure if you have to.
 //! * Don't handle `StmResult` yourself.
-//! Use `Transaction::or` to combine alternative paths and `optionally` to check if an inner
-//! function has failed. Always use `?` and 
-//! never ignore a `StmResult`.
+//!   Use `Transaction::or` to combine alternative paths and `optionally` to check if an inner
+//!   function has failed. Always use `?` and
+//!   never ignore a `StmResult`.
 //! * Don't run `atomically` inside of another. `atomically` is designed to have side effects
-//! and will therefore break transaction safety. 
-//! Nested calls are detected at runtime and handled with panicking.
-//! When you use STM in the inner of a function, then
-//! express it in the public interface, by taking `&mut Transaction` as parameter and 
-//! returning `StmResult<T>`. Callers can safely compose it into
-//! larger blocks.
+//!   and will therefore break transaction safety.
+//!   Nested calls are detected at runtime and handled with panicking.
+//!   When you use STM in the inner of a function, then
+//!   express it in the public interface, by taking `&mut Transaction` as parameter and
+//!   returning `StmResult<T>`. Callers can safely compose it into
+//!   larger blocks.
 //! * Don't mix locks and transactions. Your code will easily deadlock or slow
-//! down unpredictably.
+//!   down unpredictably.
 //! * Don't use inner mutability to change the content of a `TVar`.
 //!
-//! Panicking in a transaction is transaction-safe. The transaction aborts and 
+//! Panicking in a transaction is transaction-safe. The transaction aborts and
 //! all changes are discarded. No poisoning or half written transactions happen.
 //!
 //! # Speed
