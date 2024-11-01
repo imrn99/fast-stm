@@ -11,11 +11,10 @@ use std::any::Any;
 use std::cmp;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
-use std::mem;
 use std::sync::atomic::{self, AtomicUsize};
 use std::sync::{Arc, Weak};
 
-use super::result::*;
+use super::result::StmResult;
 use super::transaction::control_block::ControlBlock;
 use super::Transaction;
 
@@ -72,7 +71,7 @@ impl VarControlBlock {
         let threads = {
             let mut guard = self.waiting_threads.lock();
             let inner: &mut Vec<_> = &mut guard;
-            mem::replace(inner, Vec::new())
+            std::mem::take(inner)
         };
 
         // Take all, that are still alive.
@@ -117,7 +116,7 @@ impl VarControlBlock {
     }
 
     fn get_address(&self) -> usize {
-        self as *const VarControlBlock as usize
+        std::ptr::from_ref::<VarControlBlock>(self) as usize
     }
 }
 
@@ -168,6 +167,7 @@ where
         }
     }
 
+    #[allow(clippy::missing_panics_doc)]
     /// `read_atomic` reads a value atomically, without starting a transaction.
     ///
     /// It is semantically equivalent to

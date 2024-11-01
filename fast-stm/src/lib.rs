@@ -1,11 +1,3 @@
-// Copyright 2015-2018 rust-stm Developers
-//
-// Licensed under the Apache License, Version 2.0 <LICENSE-APACHE or
-// http://www.apache.org/licenses/LICENSE-2.0> or the MIT license
-// <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
-// option. This file may not be copied, modified, or distributed
-// except according to those terms.
-
 //! This library implements
 //! [software transactional memory](https://en.wikipedia.org/wiki/Software_transactional_memory),
 //! often abbreviated with STM.
@@ -85,21 +77,21 @@
 //! you should obey when dealing with software transactional memory.
 //!
 //! * Don't run code with side effects, especially no IO-code.
-//! Transactions repeat in failure cases. Using IO would repeat this IO-code.
-//! Return a closure if you have to.
+//!   Transactions repeat in failure cases. Using IO would repeat this IO-code.
+//!   Return a closure if you have to.
 //! * Don't handle `StmResult` yourself.
-//! Use `Transaction::or` to combine alternative paths and `optionally` to check if an inner
-//! function has failed. Always use `?` and
-//! never ignore a `StmResult`.
+//!   Use `Transaction::or` to combine alternative paths and `optionally` to check if an inner
+//!   function has failed. Always use `?` and
+//!   never ignore a `StmResult`.
 //! * Don't run `atomically` inside of another. `atomically` is designed to have side effects
-//! and will therefore break transaction safety.
-//! Nested calls are detected at runtime and handled with panicking.
-//! When you use STM in the inner of a function, then
-//! express it in the public interface, by taking `&mut Transaction` as parameter and
-//! returning `StmResult<T>`. Callers can safely compose it into
-//! larger blocks.
+//!   and will therefore break transaction safety.
+//!   Nested calls are detected at runtime and handled with panicking.
+//!   When you use STM in the inner of a function, then
+//!   express it in the public interface, by taking `&mut Transaction` as parameter and
+//!   returning `StmResult<T>`. Callers can safely compose it into
+//!   larger blocks.
 //! * Don't mix locks and transactions. Your code will easily deadlock or slow
-//! down unpredictably.
+//!   down unpredictably.
 //! * Don't use inner mutability to change the content of a `TVar`.
 //!
 //! Panicking in a transaction is transaction-safe. The transaction aborts and
@@ -114,6 +106,13 @@
 //! Every used `TVar` increases the chance of collisions. Therefore you should
 //! keep the amount of accessed variables as low as needed.
 //!
+
+// Extra linting with exceptions
+#![warn(clippy::pedantic)]
+#![allow(clippy::missing_errors_doc)]
+#![allow(clippy::module_name_repetitions)]
+#![allow(clippy::must_use_candidate)]
+#![allow(clippy::should_panic_without_expect)]
 
 extern crate parking_lot;
 

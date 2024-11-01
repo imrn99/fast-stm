@@ -14,7 +14,7 @@ use std::time::Duration;
 /// so don't run too many test (preferable just one) in sequence.
 pub fn terminates<F>(duration_ms: u64, f: F) -> bool
 where
-    F: Send + FnOnce() -> () + 'static,
+    F: Send + FnOnce() + 'static,
 {
     terminates_async(duration_ms, f, || {})
 }
@@ -26,8 +26,8 @@ where
 /// so don't run too many test (preferable just one) in sequence.
 pub fn terminates_async<F, G>(duration_ms: u64, f: F, g: G) -> bool
 where
-    F: Send + FnOnce() -> () + 'static,
-    G: FnOnce() -> (),
+    F: Send + FnOnce() + 'static,
+    G: FnOnce(),
 {
     async_test(duration_ms, f, g).is_some()
 }
@@ -42,7 +42,7 @@ where
 pub fn async_test<T, F, G>(duration_ms: u64, f: F, g: G) -> Option<T>
 where
     F: Send + FnOnce() -> T + 'static,
-    G: FnOnce() -> (),
+    G: FnOnce(),
     T: Send + 'static,
 {
     let (tx, rx) = channel();
