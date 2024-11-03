@@ -2,7 +2,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, Thread};
 
 #[cfg(test)]
-use super::super::test::{terminates, terminates_async};
+use crate::test::{terminates, terminates_async};
 
 /// A control block for a currently running STM instance.
 ///

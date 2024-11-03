@@ -10,8 +10,8 @@ use std::sync::Arc;
 
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
-use super::result::{StmError, StmResult};
-use super::tvar::{TVar, VarControlBlock};
+use crate::result::{StmError, StmResult};
+use crate::tvar::{TVar, VarControlBlock};
 
 thread_local!(static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) });
 

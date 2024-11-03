@@ -14,9 +14,9 @@ use std::marker::PhantomData;
 use std::sync::atomic::{self, AtomicUsize};
 use std::sync::{Arc, Weak};
 
-use super::result::StmResult;
-use super::transaction::control_block::ControlBlock;
-use super::Transaction;
+use crate::result::StmResult;
+use crate::transaction::control_block::ControlBlock;
+use crate::Transaction;
 
 /// `VarControlBlock` contains all the useful data for a `Var` while beeing the same type.
 ///

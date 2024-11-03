@@ -117,11 +117,13 @@
 extern crate parking_lot;
 
 mod result;
-mod transaction;
-mod tvar;
+mod standard;
 
 #[cfg(test)]
 mod test;
+
+use standard::transaction;
+use standard::tvar;
 
 pub use result::*;
 pub use transaction::Transaction;
