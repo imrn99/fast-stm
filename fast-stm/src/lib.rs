@@ -117,7 +117,10 @@
 extern crate parking_lot;
 
 mod result;
-mod standard;
+
+mod av; // arrayvec implementations
+mod hl; // heapless implementations
+mod standard; // regular implementations
 
 #[cfg(test)]
 mod test;
@@ -125,7 +128,7 @@ mod test;
 use standard::transaction;
 use standard::tvar;
 
-pub use result::*;
+pub use result::{StmError, StmResult};
 pub use transaction::Transaction;
 pub use transaction::TransactionControl;
 pub use tvar::TVar;
