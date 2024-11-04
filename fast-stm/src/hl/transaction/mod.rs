@@ -267,7 +267,7 @@ impl Transaction {
 
         #[allow(clippy::mutable_key_type)]
         let vars = std::mem::take(&mut self.vars);
-        let mut reads = Vec::with_capacity(self.vars.len());
+        let mut reads: heapless::Vec<_, 32> = heapless::Vec::new();
 
         let blocking = vars
             .into_iter()
@@ -280,7 +280,7 @@ impl Transaction {
                     let guard = var.value.read();
                     Arc::ptr_eq(&value, &guard)
                 };
-                reads.push(var);
+                let _ = reads.push(var);
                 x
             });
 
@@ -311,13 +311,13 @@ impl Transaction {
 
         // Created arrays for storing the locks
         // vector of locks.
-        let mut read_vec = Vec::with_capacity(self.vars.len());
+        let mut read_vec: heapless::Vec<_, 32> = heapless::Vec::new();
 
         // vector of tuple (value, lock)
-        let mut write_vec = Vec::with_capacity(self.vars.len());
+        let mut write_vec: heapless::Vec<_, 32> = heapless::Vec::new();
 
         // vector of written variables
-        let mut written = Vec::with_capacity(self.vars.len());
+        let mut written: heapless::Vec<_, 32> = heapless::Vec::new();
 
         for (var, value) in &self.vars {
             // lock the variable and read the value
@@ -328,8 +328,8 @@ impl Transaction {
                     // take write lock
                     let lock = var.value.write();
                     // add all data to the vector
-                    write_vec.push((w, lock));
-                    written.push(var);
+                    write_vec.push((w, lock)).unwrap();
+                    let _ = written.push(var);
                 }
 
                 // We need to check for consistency and
@@ -342,8 +342,8 @@ impl Transaction {
                         return false;
                     }
                     // add all data to the vector
-                    write_vec.push((w, lock));
-                    written.push(var);
+                    write_vec.push((w, lock)).unwrap();
+                    let _ = written.push(var);
                 }
                 // Nothing to do. ReadObsolete is only needed for blocking, not
                 // for consistency checks.
@@ -357,7 +357,7 @@ impl Transaction {
                         return false;
                     }
 
-                    read_vec.push(lock);
+                    read_vec.push(lock).unwrap();
                 }
             }
         }
