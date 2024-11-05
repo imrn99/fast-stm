@@ -6,6 +6,7 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
+use arrayvec::ArrayVec;
 use parking_lot::{Mutex, RwLock};
 use std::any::Any;
 use std::cmp;
@@ -23,7 +24,7 @@ use crate::result::StmResult;
 /// is just a typesafe wrapper around it.
 pub struct VarControlBlock {
     /// `waiting_threads` is a list of all waiting threads protected by a mutex.
-    waiting_threads: Mutex<Vec<Weak<ControlBlock>>>,
+    waiting_threads: Mutex<ArrayVec<Weak<ControlBlock>, 32>>,
 
     /// `dead_threads` is a counter for all dead threads.
     ///
@@ -57,7 +58,7 @@ impl VarControlBlock {
         T: Any + Sync + Send,
     {
         let ctrl = VarControlBlock {
-            waiting_threads: Mutex::new(Vec::new()),
+            waiting_threads: Mutex::new(ArrayVec::new()),
             dead_threads: AtomicUsize::new(0),
             value: RwLock::new(Arc::new(val)),
         };
@@ -69,7 +70,7 @@ impl VarControlBlock {
         // Atomically take all waiting threads from the value.
         let threads = {
             let mut guard = self.waiting_threads.lock();
-            let inner: &mut Vec<_> = &mut guard;
+            let inner: &mut ArrayVec<_, 32> = &mut guard;
             std::mem::take(inner)
         };
 

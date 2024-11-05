@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use super::tvar::{TVar, VarControlBlock};
 use crate::result::{StmError, StmResult};
+use arrayvec::ArrayVec;
 use control_block::ControlBlock;
 use log_var::LogVar;
 
@@ -267,7 +268,7 @@ impl Transaction {
 
         #[allow(clippy::mutable_key_type)]
         let vars = std::mem::take(&mut self.vars);
-        let mut reads = Vec::with_capacity(self.vars.len());
+        let mut reads: ArrayVec<_, 32> = ArrayVec::new();
 
         let blocking = vars
             .into_iter()
@@ -311,13 +312,13 @@ impl Transaction {
 
         // Created arrays for storing the locks
         // vector of locks.
-        let mut read_vec = Vec::with_capacity(self.vars.len());
+        let mut read_vec: ArrayVec<_, 32> = ArrayVec::new();
 
         // vector of tuple (value, lock)
-        let mut write_vec = Vec::with_capacity(self.vars.len());
+        let mut write_vec: ArrayVec<_, 32> = ArrayVec::new();
 
         // vector of written variables
-        let mut written = Vec::with_capacity(self.vars.len());
+        let mut written: ArrayVec<_, 32> = ArrayVec::new();
 
         for (var, value) in &self.vars {
             // lock the variable and read the value
