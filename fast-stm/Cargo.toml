@@ -11,8 +11,14 @@ keywords.workspace = true
 description.workspace = true
 authors.workspace = true
 
+[features]
+arrayvec = ["dep:arrayvec"]
+heapless = ["dep:heapless"]
+
+
 [dependencies]
-arrayvec.workspace = true
-heapless.workspace = true
+cfg-if.workspace = true
 parking_lot.workspace = true
+arrayvec = { workspace = true, optional = true }
+heapless = { workspace = true, optional = true }
 

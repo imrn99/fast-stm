@@ -118,16 +118,26 @@ extern crate parking_lot;
 
 mod result;
 
-mod av; // arrayvec implementations
-mod hl; // heapless implementations
-mod standard; // regular implementations
+cfg_if::cfg_if! {
+    if #[cfg(all(feature = "arrayvec", feature = "heapless"))] {
+        compile_error!("features are mutually exclusive, please enable only one or neither");
+    } else if #[cfg(feature = "arrayvec")] {
+        mod av;
+        use av::transaction;
+        use av::tvar;
+    } else if #[cfg(feature = "heapless")] {
+        mod hl;
+        use hl::transaction;
+        use hl::tvar;
+    } else {
+        mod standard; // regular implementations
+        use standard::transaction;
+        use standard::tvar;
+    }
+}
 
 #[cfg(test)]
 mod test;
-
-use standard::transaction;
-use standard::tvar;
-
 pub use result::{StmError, StmResult};
 pub use transaction::Transaction;
 pub use transaction::TransactionControl;
