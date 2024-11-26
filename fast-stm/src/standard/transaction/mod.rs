@@ -27,12 +27,18 @@ thread_local! {
 
     static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) };
 
+    static LAST: Cell<Option<std::thread::ThreadId>> = Cell::new(None);
     static READ_VEC: RefCell<Vec<ReadVecIn<'static>>> = RefCell::new(Vec::with_capacity(64));
     static WRITE_VEC: RefCell<Vec<WriteVecIn<'static, 'static>>> = RefCell::new(Vec::with_capacity(64));
     static WRITTEN: RefCell<Vec<WrittenIn<'static>>> = RefCell::new(Vec::with_capacity(64));
 }
 
 fn get_read_vec<'r, 'rwl>() -> &'r mut Vec<ReadVecIn<'rwl>> {
+    if LAST.get() == None {
+        LAST.set(Some(std::thread::current().id()));
+    } else {
+        assert_eq!(LAST.get(), Some(std::thread::current().id()))
+    }
     READ_VEC.with_borrow_mut(|v| unsafe { std::mem::transmute(v) })
 }
 
