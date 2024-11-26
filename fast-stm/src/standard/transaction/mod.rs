@@ -5,10 +5,11 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
+use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
 
-use parking_lot::RwLockReadGuard;
+use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
@@ -21,11 +22,53 @@ thread_local!(static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Tr
 // Reusable thread-local storage for transaction commit vectors
 // Use 'static lifetime for Arc<dyn Any>
 
+struct ReusableVec<'a, T> {
+    inner: Vec<T>,
+    _marker: PhantomData<&'a T>,
+}
+
+impl<'a, T> ReusableVec<'a, T> {
+    fn new() -> Self {
+        ReusableVec {
+            inner: Vec::with_capacity(64),
+            _marker: PhantomData,
+        }
+    }
+
+    fn clear(&mut self) {
+        self.inner.clear();
+    }
+
+    fn reserve(&mut self, capacity: usize) {
+        self.inner.reserve(capacity);
+    }
+
+    fn push(&mut self, value: T) {
+        self.inner.push(value);
+    }
+
+    fn drain(&mut self) -> impl Iterator<Item = T> + '_ {
+        self.inner.drain(..)
+    }
+}
+
+thread_local!(static COMMIT_VECTORS: (
+    RefCell<ReusableVec<'static, RwLockReadGuard<'static, Arc<dyn Any + Send + Sync>>>>,
+    RefCell<ReusableVec<'static, (&'static Arc<dyn Any + Send + Sync>, RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>>,
+    RefCell<ReusableVec<'static, &'static Arc<VarControlBlock>>>
+) = (
+    RefCell::new(ReusableVec::new()),
+    RefCell::new(ReusableVec::new()),
+    RefCell::new(ReusableVec::new()),
+));
+
+/*
 thread_local!(static COMMIT_VECTORS: RefCell<(
-        Vec<RwLockReadGuard<'static, Arc<dyn Any>>>,
+        Vec<RwLockReadGuard<'static, Arc<dyn Any + Send + Sync>>>,
         Vec<(&'static Arc<dyn Any + Send + Sync>, parking_lot::RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>,
         Vec<&'static Arc<VarControlBlock>>
     )> =  RefCell::new((Vec::with_capacity(64), Vec::with_capacity(64), Vec::with_capacity(64))) );
+*/
 
 /// `TransactionGuard` checks against nested STM calls.
 ///
@@ -324,24 +367,25 @@ impl Transaction {
     /// Write the log back to the variables.
     ///
     /// Return true for success and false, if a read var has changed
-    fn commit(&mut self) -> bool {
+    fn commit<'a>(&mut self) -> bool {
         // Use two phase locking for safely writing data back to the vars.
 
         // First phase: acquire locks.
         // Check for consistency of all the reads and perform
         // an early return if something is not consistent.
 
-        COMMIT_VECTORS.with(|vectors| {
-            let mut vectors = vectors.borrow_mut();
-
-            vectors.0.clear();
-            vectors.1.clear();
-            vectors.2.clear();
+        COMMIT_VECTORS.with(|(read_vec, write_vec, written)| {
+            // let mut vectors = vectors.borrow_mut();
 
             // Resize vectors to match potential need
-            vectors.0.reserve(self.vars.len());
-            vectors.1.reserve(self.vars.len());
-            vectors.2.reserve(self.vars.len());
+
+            read_vec.borrow_mut().clear();
+            write_vec.borrow_mut().clear();
+            written.borrow_mut().clear();
+
+            read_vec.borrow_mut().reserve(self.vars.len());
+            write_vec.borrow_mut().reserve(self.vars.len());
+            written.borrow_mut().reserve(self.vars.len());
 
             // Created arrays for storing the locks
 
@@ -359,12 +403,14 @@ impl Transaction {
                         // take write lock
                         let lock = var.value.write();
                         // add all data to the vector
-                        // write_vec.push((w, lock));
-                        // written.push(var);
-                        vectors.1.push((unsafe { std::mem::transmute(w) }, unsafe {
-                            std::mem::transmute(lock)
-                        }));
-                        vectors.2.push(unsafe { std::mem::transmute(var) });
+                        write_vec
+                            .borrow_mut()
+                            .push((unsafe { std::mem::transmute(w) }, unsafe {
+                                std::mem::transmute(lock)
+                            }));
+                        written
+                            .borrow_mut()
+                            .push(unsafe { std::mem::transmute(var) });
                     }
 
                     // We need to check for consistency and
@@ -377,12 +423,14 @@ impl Transaction {
                             return false;
                         }
                         // add all data to the vector
-                        //write_vec.push((w, lock));
-                        //written.push(var);
-                        vectors.1.push((unsafe { std::mem::transmute(w) }, unsafe {
-                            std::mem::transmute(lock)
-                        }));
-                        vectors.2.push(unsafe { std::mem::transmute(var) });
+                        write_vec
+                            .borrow_mut()
+                            .push((unsafe { std::mem::transmute(w) }, unsafe {
+                                std::mem::transmute(lock)
+                            }));
+                        written
+                            .borrow_mut()
+                            .push(unsafe { std::mem::transmute(var) });
                     }
                     // Nothing to do. ReadObsolete is only needed for blocking, not
                     // for consistency checks.
@@ -396,8 +444,9 @@ impl Transaction {
                             return false;
                         }
 
-                        // read_vec.push(lock);
-                        vectors.0.push(unsafe { std::mem::transmute(lock) });
+                        read_vec
+                            .borrow_mut()
+                            .push(unsafe { std::mem::transmute(lock) });
                     }
                 }
             }
@@ -406,36 +455,19 @@ impl Transaction {
 
             // Release the reads first.
             // This allows other threads to continue quickly.
-            vectors.0.clear();
 
-            /*
-            drop(read_vec);
+            //drop(read_vec);
+            read_vec.borrow_mut().clear();
 
-            for (value, mut lock) in write_vec {
+            for (value, mut lock) in write_vec.borrow_mut().drain() {
                 // Commit value.
                 *lock = value.clone();
             }
 
-            for var in written {
+            for var in written.borrow_mut().drain() {
                 // Unblock all threads waiting for it.
                 var.wake_all();
             }
-            */
-
-            for (value, mut lock) in vectors.1.drain(..) {
-                // Commit value.
-                *lock = value.clone();
-            }
-
-            for var in vectors.2.drain(..) {
-                // Unblock all threads waiting for it.
-                var.wake_all();
-            }
-
-            // Cleanup
-            vectors.0.clear();
-            vectors.1.clear();
-            vectors.2.clear();
 
             // Commit succeded.
             true
