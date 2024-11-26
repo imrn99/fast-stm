@@ -352,6 +352,10 @@ impl Transaction {
         // vector of written variables
         let written = get_written(); // Vec::with_capacity(self.vars.len());
 
+        read_vec.clear();
+        write_vec.clear();
+        written.clear();
+
         for (var, value) in &self.vars {
             // lock the variable and read the value
 
@@ -406,9 +410,9 @@ impl Transaction {
             *lock = value.clone();
         }
 
-        for var in written.drain(..) {
+        for var in written {
             // Unblock all threads waiting for it.
-            var.wake_all();
+            (*var).wake_all();
         }
 
         // Commit succeded.
