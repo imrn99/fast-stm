@@ -5,11 +5,8 @@ use std::any::Any;
 use std::cell::{Cell, RefCell};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
-use std::marker::PhantomData;
 use std::mem;
 use std::sync::Arc;
-
-use parking_lot::{RwLockReadGuard, RwLockWriteGuard};
 
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
@@ -18,57 +15,6 @@ use crate::tvar::{TVar, VarControlBlock};
 
 thread_local!(static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) });
 thread_local!(static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) });
-
-// Reusable thread-local storage for transaction commit vectors
-// Use 'static lifetime for Arc<dyn Any>
-
-struct ReusableVec<'a, T> {
-    inner: Vec<T>,
-    _marker: PhantomData<&'a T>,
-}
-
-impl<'a, T> ReusableVec<'a, T> {
-    fn new() -> Self {
-        ReusableVec {
-            inner: Vec::with_capacity(64),
-            _marker: PhantomData,
-        }
-    }
-
-    fn clear(&mut self) {
-        self.inner.clear();
-    }
-
-    fn reserve(&mut self, capacity: usize) {
-        self.inner.reserve(capacity);
-    }
-
-    fn push(&mut self, value: T) {
-        self.inner.push(value);
-    }
-
-    fn drain(&mut self) -> impl Iterator<Item = T> + '_ {
-        self.inner.drain(..)
-    }
-}
-
-thread_local!(static COMMIT_VECTORS: (
-    RefCell<ReusableVec<'static, RwLockReadGuard<'static, Arc<dyn Any + Send + Sync>>>>,
-    RefCell<ReusableVec<'static, (Arc<dyn Any + Send + Sync>, RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>>,
-    RefCell<ReusableVec<'static, Arc<VarControlBlock>>>
-) = (
-    RefCell::new(ReusableVec::new()),
-    RefCell::new(ReusableVec::new()),
-    RefCell::new(ReusableVec::new()),
-));
-
-/*
-thread_local!(static COMMIT_VECTORS: RefCell<(
-        Vec<RwLockReadGuard<'static, Arc<dyn Any + Send + Sync>>>,
-        Vec<(&'static Arc<dyn Any + Send + Sync>, parking_lot::RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>,
-        Vec<&'static Arc<VarControlBlock>>
-    )> =  RefCell::new((Vec::with_capacity(64), Vec::with_capacity(64), Vec::with_capacity(64))) );
-*/
 
 /// `TransactionGuard` checks against nested STM calls.
 ///
@@ -116,7 +62,7 @@ impl Transaction {
     ///
     /// Normally you don't need to call this directly.
     /// Use `atomically` instead.
-    const fn new() -> Self {
+    const fn new() -> Transaction {
         Transaction {
             vars: BTreeMap::new(),
             read_refs: Vec::new(),
@@ -157,41 +103,37 @@ impl Transaction {
         // create a log guard for initializing and cleaning up the log
         let _guard = TransactionGuard::new();
 
-        let mut transaction = Transaction::new();
+        let tmp = TRANSACTION.with_borrow_mut(|transaction| {
+            // loop until success
+            loop {
+                // run the computation
+                match f(transaction) {
+                    // on success exit loop
+                    Ok(t) => {
+                        if transaction.commit() {
+                            return Some(t);
+                        }
+                    }
 
-        // if we passed the guard, we're the only borrow, so this cannot fail
-        // let tmp = TRANSACTION.with_borrow_mut(|transaction| {
-        // loop until success
-        loop {
-            // run the computation
-            match f(&mut transaction) {
-                // on success exit loop
-                Ok(t) => {
-                    if transaction.commit() {
-                        return Some(t);
+                    Err(e) => {
+                        // Check if the user wants to abort the transaction.
+                        if let TransactionControl::Abort = control(e) {
+                            return None;
+                        }
+
+                        // on retry wait for changes
+                        if let StmError::Retry = e {
+                            transaction.wait_for_change();
+                        }
                     }
                 }
 
-                Err(e) => {
-                    // Check if the user wants to abort the transaction.
-                    if let TransactionControl::Abort = control(e) {
-                        return None;
-                    }
-
-                    // on retry wait for changes
-                    if let StmError::Retry = e {
-                        transaction.wait_for_change();
-                    }
-                }
+                // clear log before retrying computation
+                transaction.clear();
             }
-
-            // clear log before retrying computation
-            transaction.clear();
-        }
-        // });
-
-        // TRANSACTION.with_borrow_mut(Transaction::clear);
-        // tmp
+        });
+        TRANSACTION.with_borrow_mut(Transaction::clear);
+        tmp
     }
 
     #[allow(clippy::needless_pass_by_value)]
@@ -330,7 +272,7 @@ impl Transaction {
 
         #[allow(clippy::mutable_key_type)]
         let vars = std::mem::take(&mut self.vars);
-        self.read_refs.reserve(self.vars.len());
+        let mut reads = Vec::with_capacity(self.vars.len());
 
         let blocking = vars
             .into_iter()
@@ -343,7 +285,7 @@ impl Transaction {
                     let guard = var.value.read();
                     Arc::ptr_eq(&value, &guard)
                 };
-                self.read_refs.push(var);
+                reads.push(var);
                 x
             });
 
@@ -357,113 +299,92 @@ impl Transaction {
         // It does not matter, if we set too many
         // to dead since it may slightly reduce performance
         // but not break the semantics.
-        for var in &self.read_refs {
+        for var in &reads {
             var.set_dead();
         }
-
-        self.read_refs.clear();
     }
 
     /// Write the log back to the variables.
     ///
     /// Return true for success and false, if a read var has changed
-    fn commit<'a>(&mut self) -> bool {
+    fn commit(&mut self) -> bool {
         // Use two phase locking for safely writing data back to the vars.
 
         // First phase: acquire locks.
         // Check for consistency of all the reads and perform
         // an early return if something is not consistent.
 
-        COMMIT_VECTORS.with(|(read_vec, write_vec, written)| {
-            // let mut vectors = vectors.borrow_mut();
+        // Created arrays for storing the locks
+        // vector of locks.
+        let mut read_vec = Vec::with_capacity(self.vars.len());
 
-            // Resize vectors to match potential need
+        // vector of tuple (value, lock)
+        let mut write_vec = Vec::with_capacity(self.vars.len());
 
-            read_vec.borrow_mut().clear();
-            write_vec.borrow_mut().clear();
-            written.borrow_mut().clear();
+        // vector of written variables
+        let mut written = Vec::with_capacity(self.vars.len());
 
-            read_vec.borrow_mut().reserve(self.vars.len());
-            write_vec.borrow_mut().reserve(self.vars.len());
-            written.borrow_mut().reserve(self.vars.len());
+        for (var, value) in &self.vars {
+            // lock the variable and read the value
 
-            // Created arrays for storing the locks
+            match *value {
+                // We need to take a write lock.
+                LogVar::Write(ref w) | LogVar::ReadObsoleteWrite(_, ref w) => {
+                    // take write lock
+                    let lock = var.value.write();
+                    // add all data to the vector
+                    write_vec.push((w, lock));
+                    written.push(var);
+                }
 
-            /*
-            let mut read_vec = Vec::with_capacity(self.vars.len()); // vector of locks.
-            let mut write_vec = Vec::with_capacity(self.vars.len()); // vector of tuple (value, lock)
-            let mut written = Vec::with_capacity(self.vars.len()); // vector of written variables
-            */
-            for (var, value) in &self.vars {
-                // lock the variable and read the value
+                // We need to check for consistency and
+                // take a write lock.
+                LogVar::ReadWrite(ref original, ref w) => {
+                    // take write lock
+                    let lock = var.value.write();
 
-                match *value {
-                    // We need to take a write lock.
-                    LogVar::Write(ref w) | LogVar::ReadObsoleteWrite(_, ref w) => {
-                        // take write lock
-                        let lock = var.value.write();
-                        // add all data to the vector
-                        write_vec
-                            .borrow_mut()
-                            .push((w.clone(), unsafe { std::mem::transmute(lock) }));
-                        written.borrow_mut().push(var.clone());
+                    if !Arc::ptr_eq(&lock, original) {
+                        return false;
+                    }
+                    // add all data to the vector
+                    write_vec.push((w, lock));
+                    written.push(var);
+                }
+                // Nothing to do. ReadObsolete is only needed for blocking, not
+                // for consistency checks.
+                LogVar::ReadObsolete(_) => {}
+                // Take read lock and check for consistency.
+                LogVar::Read(ref original) => {
+                    // Take a read lock.
+                    let lock = var.value.read();
+
+                    if !Arc::ptr_eq(&lock, original) {
+                        return false;
                     }
 
-                    // We need to check for consistency and
-                    // take a write lock.
-                    LogVar::ReadWrite(ref original, ref w) => {
-                        // take write lock
-                        let lock = var.value.write();
-
-                        if !Arc::ptr_eq(&lock, original) {
-                            return false;
-                        }
-                        // add all data to the vector
-                        write_vec
-                            .borrow_mut()
-                            .push((w.clone(), unsafe { std::mem::transmute(lock) }));
-                        written.borrow_mut().push(var.clone());
-                    }
-                    // Nothing to do. ReadObsolete is only needed for blocking, not
-                    // for consistency checks.
-                    LogVar::ReadObsolete(_) => {}
-                    // Take read lock and check for consistency.
-                    LogVar::Read(ref original) => {
-                        // Take a read lock.
-                        let lock = var.value.read();
-
-                        if !Arc::ptr_eq(&lock, original) {
-                            return false;
-                        }
-
-                        read_vec
-                            .borrow_mut()
-                            .push(unsafe { std::mem::transmute(lock) });
-                    }
+                    read_vec.push(lock);
                 }
             }
+        }
 
-            // Second phase: write back and release
+        // Second phase: write back and release
 
-            // Release the reads first.
-            // This allows other threads to continue quickly.
+        // Release the reads first.
+        // This allows other threads to continue quickly.
+        drop(read_vec);
 
-            //drop(read_vec);
-            read_vec.borrow_mut().clear();
+        for (value, mut lock) in write_vec {
+            // Commit value.
+            *lock = value.clone();
+        }
 
-            for (value, mut lock) in write_vec.borrow_mut().drain() {
-                // Commit value.
-                *lock = value.clone();
-            }
+        for var in written {
+            // Unblock all threads waiting for it.
+            var.wake_all();
+        }
 
-            for var in written.borrow_mut().drain() {
-                // Unblock all threads waiting for it.
-                var.wake_all();
-            }
-
-            // Commit succeded.
-            true
-        })
+        // Commit succeded.
+        true
     }
 }
 
