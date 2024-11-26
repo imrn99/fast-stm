@@ -8,13 +8,41 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::sync::Arc;
 
+use parking_lot::RwLockReadGuard;
+
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
 use crate::result::{StmError, StmResult};
 use crate::tvar::{TVar, VarControlBlock};
 
-thread_local!(static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) });
-thread_local!(static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) });
+type ReadVecIn<'rwl> = RwLockReadGuard<'rwl, Arc<dyn Any + Send + Sync>>;
+type WriteVecIn<'b, 'rwl> = (
+    &'b Arc<dyn Any + Send + Sync>,
+    parking_lot::RwLockWriteGuard<'rwl, Arc<dyn Any + Send + Sync>>,
+);
+type WrittenIn<'b> = &'b Arc<VarControlBlock>;
+
+thread_local! {
+    static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) };
+
+    static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) };
+
+    static READ_VEC: RefCell<Vec<ReadVecIn<'static>>> = RefCell::new(Vec::with_capacity(64));
+    static WRITE_VEC: RefCell<Vec<WriteVecIn<'static, 'static>>> = RefCell::new(Vec::with_capacity(64));
+    static WRITTEN: RefCell<Vec<WrittenIn<'static>>> = RefCell::new(Vec::with_capacity(64));
+}
+
+fn get_read_vec<'r, 'rwl>() -> &'r mut Vec<ReadVecIn<'rwl>> {
+    READ_VEC.with_borrow_mut(|v| unsafe { std::mem::transmute(v) })
+}
+
+fn get_write_vec<'r, 'b, 'rwl>() -> &'r mut Vec<WriteVecIn<'b, 'rwl>> {
+    WRITE_VEC.with_borrow_mut(|v| unsafe { std::mem::transmute(v) })
+}
+
+fn get_written<'r, 'b>() -> &'r mut Vec<WrittenIn<'b>> {
+    WRITTEN.with_borrow_mut(|v| unsafe { std::mem::transmute(v) })
+}
 
 /// `TransactionGuard` checks against nested STM calls.
 ///
@@ -316,13 +344,13 @@ impl Transaction {
 
         // Created arrays for storing the locks
         // vector of locks.
-        let mut read_vec = Vec::with_capacity(self.vars.len());
+        let read_vec = get_read_vec(); // Vec::with_capacity(self.vars.len());
 
         // vector of tuple (value, lock)
-        let mut write_vec = Vec::with_capacity(self.vars.len());
+        let write_vec = get_write_vec(); // Vec::with_capacity(self.vars.len());
 
         // vector of written variables
-        let mut written = Vec::with_capacity(self.vars.len());
+        let written = get_written(); // Vec::with_capacity(self.vars.len());
 
         for (var, value) in &self.vars {
             // lock the variable and read the value
@@ -371,14 +399,14 @@ impl Transaction {
 
         // Release the reads first.
         // This allows other threads to continue quickly.
-        drop(read_vec);
+        read_vec.clear();
 
-        for (value, mut lock) in write_vec {
+        for (value, mut lock) in write_vec.drain(..) {
             // Commit value.
             *lock = value.clone();
         }
 
-        for var in written {
+        for var in written.drain(..) {
             // Unblock all threads waiting for it.
             var.wake_all();
         }
