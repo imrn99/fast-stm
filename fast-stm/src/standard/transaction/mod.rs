@@ -20,13 +20,12 @@ thread_local!(static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Tr
 
 // Reusable thread-local storage for transaction commit vectors
 // Use 'static lifetime for Arc<dyn Any>
-/*
+
 thread_local!(static COMMIT_VECTORS: RefCell<(
         Vec<RwLockReadGuard<'static, Arc<dyn Any>>>,
         Vec<(&'static Arc<dyn Any + Send + Sync>, parking_lot::RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>,
         Vec<&'static Arc<VarControlBlock>>
     )> =  RefCell::new((Vec::with_capacity(64), Vec::with_capacity(64), Vec::with_capacity(64))) );
-*/
 
 /// `TransactionGuard` checks against nested STM calls.
 ///
@@ -332,113 +331,115 @@ impl Transaction {
         // Check for consistency of all the reads and perform
         // an early return if something is not consistent.
 
-        /*COMMIT_VECTORS.with(|vectors| {
-        let mut vectors = vectors.borrow_mut();
+        COMMIT_VECTORS.with(|vectors| {
+            let mut vectors = vectors.borrow_mut();
 
-        // Resize vectors to match potential need
-        vectors.0.reserve(self.vars.len());
-        vectors.1.reserve(self.vars.len());
-        vectors.2.reserve(self.vars.len());*/
+            vectors.0.clear();
+            vectors.1.clear();
+            vectors.2.clear();
 
-        // Created arrays for storing the locks
-        // vector of locks.
-        let mut read_vec = Vec::with_capacity(self.vars.len());
+            // Resize vectors to match potential need
+            vectors.0.reserve(self.vars.len());
+            vectors.1.reserve(self.vars.len());
+            vectors.2.reserve(self.vars.len());
 
-        // vector of tuple (value, lock)
-        let mut write_vec = Vec::with_capacity(self.vars.len());
+            // Created arrays for storing the locks
 
-        // vector of written variables
-        let mut written = Vec::with_capacity(self.vars.len());
+            /*
+            let mut read_vec = Vec::with_capacity(self.vars.len()); // vector of locks.
+            let mut write_vec = Vec::with_capacity(self.vars.len()); // vector of tuple (value, lock)
+            let mut written = Vec::with_capacity(self.vars.len()); // vector of written variables
+            */
+            for (var, value) in &self.vars {
+                // lock the variable and read the value
 
-        for (var, value) in &self.vars {
-            // lock the variable and read the value
-
-            match *value {
-                // We need to take a write lock.
-                LogVar::Write(ref w) | LogVar::ReadObsoleteWrite(_, ref w) => {
-                    // take write lock
-                    let lock = var.value.write();
-                    // add all data to the vector
-                    write_vec.push((w, lock));
-                    written.push(var);
-                    /*vectors.1.push((unsafe { std::mem::transmute(w) }, unsafe {
-                        std::mem::transmute(lock)
-                    }));
-                    vectors.2.push(unsafe { std::mem::transmute(var) });
-                    */
-                }
-
-                // We need to check for consistency and
-                // take a write lock.
-                LogVar::ReadWrite(ref original, ref w) => {
-                    // take write lock
-                    let lock = var.value.write();
-
-                    if !Arc::ptr_eq(&lock, original) {
-                        return false;
-                    }
-                    // add all data to the vector
-                    write_vec.push((w, lock));
-                    written.push(var);
-                    /*    vectors.1.push((unsafe { std::mem::transmute(w) }, unsafe {
+                match *value {
+                    // We need to take a write lock.
+                    LogVar::Write(ref w) | LogVar::ReadObsoleteWrite(_, ref w) => {
+                        // take write lock
+                        let lock = var.value.write();
+                        // add all data to the vector
+                        // write_vec.push((w, lock));
+                        // written.push(var);
+                        vectors.1.push((unsafe { std::mem::transmute(w) }, unsafe {
                             std::mem::transmute(lock)
                         }));
                         vectors.2.push(unsafe { std::mem::transmute(var) });
-                    */
-                }
-                // Nothing to do. ReadObsolete is only needed for blocking, not
-                // for consistency checks.
-                LogVar::ReadObsolete(_) => {}
-                // Take read lock and check for consistency.
-                LogVar::Read(ref original) => {
-                    // Take a read lock.
-                    let lock = var.value.read();
-
-                    if !Arc::ptr_eq(&lock, original) {
-                        return false;
                     }
 
-                    read_vec.push(lock);
-                    // vectors.0.push(unsafe { std::mem::transmute(lock) });
+                    // We need to check for consistency and
+                    // take a write lock.
+                    LogVar::ReadWrite(ref original, ref w) => {
+                        // take write lock
+                        let lock = var.value.write();
+
+                        if !Arc::ptr_eq(&lock, original) {
+                            return false;
+                        }
+                        // add all data to the vector
+                        //write_vec.push((w, lock));
+                        //written.push(var);
+                        vectors.1.push((unsafe { std::mem::transmute(w) }, unsafe {
+                            std::mem::transmute(lock)
+                        }));
+                        vectors.2.push(unsafe { std::mem::transmute(var) });
+                    }
+                    // Nothing to do. ReadObsolete is only needed for blocking, not
+                    // for consistency checks.
+                    LogVar::ReadObsolete(_) => {}
+                    // Take read lock and check for consistency.
+                    LogVar::Read(ref original) => {
+                        // Take a read lock.
+                        let lock = var.value.read();
+
+                        if !Arc::ptr_eq(&lock, original) {
+                            return false;
+                        }
+
+                        // read_vec.push(lock);
+                        vectors.0.push(unsafe { std::mem::transmute(lock) });
+                    }
                 }
             }
-        }
 
-        // Second phase: write back and release
+            // Second phase: write back and release
 
-        // Release the reads first.
-        // This allows other threads to continue quickly.
-        drop(read_vec);
-        // vectors.0.clear();
+            // Release the reads first.
+            // This allows other threads to continue quickly.
+            vectors.0.clear();
 
-        for (value, mut lock) in write_vec {
-            // Commit value.
-            *lock = value.clone();
-        }
+            /*
+            drop(read_vec);
 
-        for var in written {
-            // Unblock all threads waiting for it.
-            var.wake_all();
-        }
+            for (value, mut lock) in write_vec {
+                // Commit value.
+                *lock = value.clone();
+            }
 
-        /*for (value, mut lock) in vectors.1.drain(..) {
-            // Commit value.
-            *lock = value.clone();
-        }
+            for var in written {
+                // Unblock all threads waiting for it.
+                var.wake_all();
+            }
+            */
 
+            for (value, mut lock) in vectors.1.drain(..) {
+                // Commit value.
+                *lock = value.clone();
+            }
 
-        for var in vectors.2.drain(..) {
-            // Unblock all threads waiting for it.
-            var.wake_all();
-        }*/
+            for var in vectors.2.drain(..) {
+                // Unblock all threads waiting for it.
+                var.wake_all();
+            }
 
-        // Cleanup
-        // vectors.1.clear();
-        // vectors.2.clear();
+            // Cleanup
+            vectors.0.clear();
+            vectors.1.clear();
+            vectors.2.clear();
 
-        // Commit suc ceded.
-        true
-        //})
+            // Commit succeded.
+            true
+        })
     }
 }
 
