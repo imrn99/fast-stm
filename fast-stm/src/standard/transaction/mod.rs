@@ -16,7 +16,7 @@ use crate::result::{StmError, StmResult};
 use crate::tvar::{TVar, VarControlBlock};
 
 thread_local!(static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) });
-thread_local!(static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) });
+// thread_local!(static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) });
 
 // Reusable thread-local storage for transaction commit vectors
 // Use 'static lifetime for Arc<dyn Any>
@@ -113,39 +113,41 @@ impl Transaction {
         // create a log guard for initializing and cleaning up the log
         let _guard = TransactionGuard::new();
 
+        let mut transaction = Transaction::new();
+
         // if we passed the guard, we're the only borrow, so this cannot fail
-        let tmp = TRANSACTION.with_borrow_mut(|transaction| {
-            // loop until success
-            loop {
-                // run the computation
-                match f(transaction) {
-                    // on success exit loop
-                    Ok(t) => {
-                        if transaction.commit() {
-                            return Some(t);
-                        }
-                    }
-
-                    Err(e) => {
-                        // Check if the user wants to abort the transaction.
-                        if let TransactionControl::Abort = control(e) {
-                            return None;
-                        }
-
-                        // on retry wait for changes
-                        if let StmError::Retry = e {
-                            transaction.wait_for_change();
-                        }
+        // let tmp = TRANSACTION.with_borrow_mut(|transaction| {
+        // loop until success
+        loop {
+            // run the computation
+            match f(&mut transaction) {
+                // on success exit loop
+                Ok(t) => {
+                    if transaction.commit() {
+                        return Some(t);
                     }
                 }
 
-                // clear log before retrying computation
-                transaction.clear();
-            }
-        });
+                Err(e) => {
+                    // Check if the user wants to abort the transaction.
+                    if let TransactionControl::Abort = control(e) {
+                        return None;
+                    }
 
-        TRANSACTION.with_borrow_mut(Transaction::clear);
-        tmp
+                    // on retry wait for changes
+                    if let StmError::Retry = e {
+                        transaction.wait_for_change();
+                    }
+                }
+            }
+
+            // clear log before retrying computation
+            transaction.clear();
+        }
+        // });
+
+        // TRANSACTION.with_borrow_mut(Transaction::clear);
+        // tmp
     }
 
     #[allow(clippy::needless_pass_by_value)]
