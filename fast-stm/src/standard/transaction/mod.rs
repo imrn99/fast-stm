@@ -54,8 +54,8 @@ impl<'a, T> ReusableVec<'a, T> {
 
 thread_local!(static COMMIT_VECTORS: (
     RefCell<ReusableVec<'static, RwLockReadGuard<'static, Arc<dyn Any + Send + Sync>>>>,
-    RefCell<ReusableVec<'static, (&'static Arc<dyn Any + Send + Sync>, RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>>,
-    RefCell<ReusableVec<'static, &'static Arc<VarControlBlock>>>
+    RefCell<ReusableVec<'static, (Arc<dyn Any + Send + Sync>, RwLockWriteGuard<'static, Arc<dyn Any + Send + Sync>>)>>,
+    RefCell<ReusableVec<'static, Arc<VarControlBlock>>>
 ) = (
     RefCell::new(ReusableVec::new()),
     RefCell::new(ReusableVec::new()),
@@ -405,12 +405,8 @@ impl Transaction {
                         // add all data to the vector
                         write_vec
                             .borrow_mut()
-                            .push((unsafe { std::mem::transmute(w) }, unsafe {
-                                std::mem::transmute(lock)
-                            }));
-                        written
-                            .borrow_mut()
-                            .push(unsafe { std::mem::transmute(var) });
+                            .push((w.clone(), unsafe { std::mem::transmute(lock) }));
+                        written.borrow_mut().push(var.clone());
                     }
 
                     // We need to check for consistency and
@@ -425,12 +421,8 @@ impl Transaction {
                         // add all data to the vector
                         write_vec
                             .borrow_mut()
-                            .push((unsafe { std::mem::transmute(w) }, unsafe {
-                                std::mem::transmute(lock)
-                            }));
-                        written
-                            .borrow_mut()
-                            .push(unsafe { std::mem::transmute(var) });
+                            .push((w.clone(), unsafe { std::mem::transmute(lock) }));
+                        written.borrow_mut().push(var.clone());
                     }
                     // Nothing to do. ReadObsolete is only needed for blocking, not
                     // for consistency checks.
