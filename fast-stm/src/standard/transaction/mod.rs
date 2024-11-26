@@ -351,9 +351,11 @@ impl Transaction {
         let write_vec = get_write_vec();
         let written = get_written();
 
+        /*
         let mut read_vec = Vec::with_capacity(64);
         let mut write_vec = Vec::with_capacity(64);
         let mut written = Vec::with_capacity(64);
+        */
 
         read_vec.clear();
         write_vec.clear();
@@ -406,12 +408,17 @@ impl Transaction {
 
         // Release the reads first.
         // This allows other threads to continue quickly.
-        read_vec.clear();
+        for lock in read_vec.drain(..) {
+            drop(lock);
+        }
 
         for (value, mut lock) in write_vec.drain(..) {
             // Commit value.
             *lock = value.clone();
+            drop(lock);
         }
+
+        write_vec.clear();
 
         for var in written.drain(..) {
             // Unblock all threads waiting for it.
