@@ -25,7 +25,7 @@ type WrittenIn<'b> = &'b Arc<VarControlBlock>;
 thread_local! {
     static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) };
 
-    static TRANSACTION: RefCell<Transaction> = const { RefCell::new(Transaction::new()) };
+    static TRANSACTION: RefCell<Transaction> = { RefCell::new(Transaction::new()) };
 
     static READ_VEC: RefCell<Vec<ReadVecIn<'static>>> = RefCell::new(Vec::with_capacity(64));
     static WRITE_VEC: RefCell<Vec<WriteVecIn<'static, 'static>>> = RefCell::new(Vec::with_capacity(64));
@@ -90,7 +90,7 @@ impl Transaction {
     ///
     /// Normally you don't need to call this directly.
     /// Use `atomically` instead.
-    const fn new() -> Transaction {
+    fn new() -> Transaction {
         Transaction {
             vars: BTreeMap::new(),
             read_refs: Vec::new(),
@@ -343,14 +343,17 @@ impl Transaction {
         // an early return if something is not consistent.
 
         // Created arrays for storing the locks
-        // vector of locks.
-        let read_vec = get_read_vec(); // Vec::with_capacity(self.vars.len());
+        // - vector of locks.
+        // - vector of tuple (value, lock)
+        // - vector of written variables
 
-        // vector of tuple (value, lock)
-        let write_vec = get_write_vec(); // Vec::with_capacity(self.vars.len());
+        let read_vec = get_read_vec();
+        let write_vec = get_write_vec();
+        let written = get_written();
 
-        // vector of written variables
-        let written = get_written(); // Vec::with_capacity(self.vars.len());
+        let mut read_vec = Vec::with_capacity(64);
+        let mut write_vec = Vec::with_capacity(64);
+        let mut written = Vec::with_capacity(64);
 
         read_vec.clear();
         write_vec.clear();
@@ -410,7 +413,7 @@ impl Transaction {
             *lock = value.clone();
         }
 
-        for var in written.iter() {
+        for var in written.drain(..) {
             // Unblock all threads waiting for it.
             var.wake_all();
         }
