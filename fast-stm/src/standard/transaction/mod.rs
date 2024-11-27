@@ -8,6 +8,7 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::sync::Arc;
 
+use arrayvec::ArrayVec;
 use parking_lot::RwLockReadGuard;
 
 use self::control_block::ControlBlock;
@@ -364,15 +365,17 @@ impl Transaction {
                 let mut read_vec = Vec::with_capacity(64);
                 let mut write_vec = Vec::with_capacity(64);
                 let mut written = Vec::with_capacity(64);
-        */
 
         let read_vec = &mut READ_VEC.with(|r| r.borrow_mut());
         let write_vec = &mut WRITE_VEC.with(|w| w.borrow_mut());
         let written = &mut WRITTEN.with(|w| w.borrow_mut());
 
-        read_vec.clear();
-        write_vec.clear();
-        written.clear();
+        */
+
+        let mut read_vec: ArrayVec<_, 64> = ArrayVec::new_const();
+        let mut write_vec: ArrayVec<_, 64> = ArrayVec::new_const();
+        let mut written: ArrayVec<_, 64> = ArrayVec::new_const();
+
         for (var, value) in &self.vars {
             // lock the variable and read the value
 

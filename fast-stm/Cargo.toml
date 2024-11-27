@@ -12,13 +12,12 @@ description.workspace = true
 authors.workspace = true
 
 [features]
-arrayvec = ["dep:arrayvec"]
 heapless = ["dep:heapless"]
 
 
 [dependencies]
 cfg-if.workspace = true
 parking_lot.workspace = true
-arrayvec = { workspace = true, optional = true }
+arrayvec = { workspace = true }
 heapless = { workspace = true, optional = true }
 
