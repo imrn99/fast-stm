@@ -21,3 +21,16 @@ pub enum StmError {
 /// For the later case, there is the `transaction.or(action1, action2)`, that
 /// is safe to use.
 pub type StmResult<T> = Result<T, StmError>;
+
+#[derive(Eq, PartialEq, Clone, Copy, Debug, thiserror::Error)]
+pub enum TransactionError<E> {
+    /// Failed due to [`StmError`].
+    Stm(#[from] StmError),
+    /// `abort` was called.
+    ///
+    /// The transaction will be aborted and the error returned.
+    Abort(E),
+}
+
+/// Result of a transaction with failure potential
+pub type TransactionResult<T, E> = Result<T, TransactionError<E>>;
