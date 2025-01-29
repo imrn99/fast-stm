@@ -1,12 +1,14 @@
-#[derive(Eq, PartialEq, Clone, Copy, Debug)]
+#[derive(Eq, PartialEq, Clone, Copy, Debug, thiserror::Error)]
 pub enum StmError {
     /// The call failed, because a variable, the computation
     /// depends on, has changed.
+    #[error("Transaction failure signal")]
     Failure,
 
     /// `retry` was called.
     ///
     /// It may block until at least one read variable has changed.
+    #[error("Transaction retry signal")]
     Retry,
 }
 
