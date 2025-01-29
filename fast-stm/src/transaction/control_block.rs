@@ -1,5 +1,6 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread::{self, Thread};
+use std::time::Duration;
 
 #[cfg(test)]
 use super::super::test::{terminates, terminates_async};
@@ -18,6 +19,9 @@ pub struct ControlBlock {
     /// Atomic bool stores if the thread has been blocked yet.
     /// Make sure, that park is repeated if no change has happened.
     blocked: AtomicBool,
+
+    /// Upper bound on time a thread is parked. This prevents a possible deadlock.
+    max_parked_time: Duration,
 }
 
 impl Default for ControlBlock {
@@ -32,6 +36,7 @@ impl ControlBlock {
         ControlBlock {
             thread: thread::current(),
             blocked: AtomicBool::new(true),
+            max_parked_time: Duration::from_millis(1000),
         }
     }
 
@@ -53,7 +58,12 @@ impl ControlBlock {
     /// `wait` needs to be called by the STM instance itself.
     pub fn wait(&self) {
         while self.blocked.load(Ordering::SeqCst) {
+            /* // original code:
             thread::park();
+            */
+
+            // deadlock-safe code:
+            thread::park_timeout(self.max_parked_time);
         }
     }
 }
