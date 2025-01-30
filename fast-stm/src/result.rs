@@ -33,4 +33,10 @@ pub enum TransactionError<E> {
 }
 
 /// Result of a transaction with failure potential
-pub type TransactionResult<T, E> = Result<T, TransactionError<E>>;
+pub type TransactionClosureResult<T, E> = Result<T, TransactionError<E>>;
+
+pub enum TransactionResult<T, E> {
+    Validated(T),
+    Aborted(E),
+    Failed,
+}
