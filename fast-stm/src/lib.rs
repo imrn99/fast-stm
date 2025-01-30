@@ -162,7 +162,7 @@ pub fn abort<T, E>(e: E) -> TransactionClosureResult<T, E> {
 /// # use fast_stm::*;
 /// let infinite_retry: i32 = atomically(|_| retry());
 /// ```
-pub fn retry<T>() -> StmResult<T> {
+pub fn retry<T>() -> StmClosureResult<T> {
     Err(StmError::Retry)
 }
 
@@ -170,7 +170,7 @@ pub fn retry<T>() -> StmResult<T> {
 /// It calls to `Transaction::with` internally, but is more explicit.
 pub fn atomically<T, F>(f: F) -> T
 where
-    F: Fn(&mut Transaction) -> StmResult<T>,
+    F: Fn(&mut Transaction) -> StmClosureResult<T>,
 {
     Transaction::with(f)
 }
@@ -202,7 +202,7 @@ where
 ///     }
 /// );
 /// ```
-pub fn unwrap_or_retry<T>(option: Option<T>) -> StmResult<T> {
+pub fn unwrap_or_retry<T>(option: Option<T>) -> StmClosureResult<T> {
     match option {
         Some(x) => Ok(x),
         None => retry(),
@@ -226,7 +226,7 @@ pub fn unwrap_or_retry<T>(option: Option<T>) -> StmResult<T> {
 /// });
 /// assert_eq!(x, 42);
 /// ```
-pub fn guard(cond: bool) -> StmResult<()> {
+pub fn guard(cond: bool) -> StmClosureResult<()> {
     if cond {
         Ok(())
     } else {
@@ -251,9 +251,9 @@ pub fn guard(cond: bool) -> StmResult<()> {
 ///     optionally(tx, |_| retry()));
 /// assert_eq!(x, None);
 /// ```
-pub fn optionally<T, F>(tx: &mut Transaction, f: F) -> StmResult<Option<T>>
+pub fn optionally<T, F>(tx: &mut Transaction, f: F) -> StmClosureResult<Option<T>>
 where
-    F: Fn(&mut Transaction) -> StmResult<T>,
+    F: Fn(&mut Transaction) -> StmClosureResult<T>,
 {
     tx.or(|t| f(t).map(Some), |_| Ok(None))
 }

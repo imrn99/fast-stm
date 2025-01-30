@@ -12,7 +12,7 @@ use crate::{TransactionClosureResult, TransactionError, TransactionResult};
 
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
-use super::result::{StmError, StmResult};
+use super::result::{StmClosureResult, StmError};
 use super::tvar::{TVar, VarControlBlock};
 
 thread_local!(static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) });
@@ -73,7 +73,7 @@ impl Transaction {
     /// It is equivalent to `atomically`.
     pub fn with<T, F>(f: F) -> T
     where
-        F: Fn(&mut Transaction) -> StmResult<T>,
+        F: Fn(&mut Transaction) -> StmClosureResult<T>,
     {
         match Transaction::with_control(|_| TransactionControl::Retry, f) {
             Some(t) => t,
@@ -96,7 +96,7 @@ impl Transaction {
     /// If you need a timeout, another thread should signal this through a [`TVar`].
     pub fn with_control<T, F, C>(mut control: C, f: F) -> Option<T>
     where
-        F: Fn(&mut Transaction) -> StmResult<T>,
+        F: Fn(&mut Transaction) -> StmClosureResult<T>,
         C: FnMut(StmError) -> TransactionControl,
     {
         let _guard = TransactionGuard::new();
@@ -252,7 +252,7 @@ impl Transaction {
     /// The used code should be capable of handling inconsistent states
     /// without running into infinite loops.
     /// Just the commit of wrong values is prevented by STM.
-    pub fn read<T: Send + Sync + Any + Clone>(&mut self, var: &TVar<T>) -> StmResult<T> {
+    pub fn read<T: Send + Sync + Any + Clone>(&mut self, var: &TVar<T>) -> StmClosureResult<T> {
         let ctrl = var.control_block().clone();
         // Check if the same var was written before.
         let value = match self.vars.entry(ctrl) {
@@ -282,7 +282,7 @@ impl Transaction {
         &mut self,
         var: &TVar<T>,
         value: T,
-    ) -> StmResult<()> {
+    ) -> StmClosureResult<()> {
         // box the value
         let boxed = Arc::new(value);
 
@@ -306,10 +306,10 @@ impl Transaction {
     /// If both block, `Transaction::or` still waits for `TVar`s in both functions.
     /// Use `Transaction::or` instead of handling errors directly with the `Result::or`.
     /// The later does not handle all the blocking correctly.
-    pub fn or<T, F1, F2>(&mut self, first: F1, second: F2) -> StmResult<T>
+    pub fn or<T, F1, F2>(&mut self, first: F1, second: F2) -> StmClosureResult<T>
     where
-        F1: Fn(&mut Transaction) -> StmResult<T>,
-        F2: Fn(&mut Transaction) -> StmResult<T>,
+        F1: Fn(&mut Transaction) -> StmClosureResult<T>,
+        F2: Fn(&mut Transaction) -> StmClosureResult<T>,
     {
         // Create a backup of the log.
         let mut copy = Transaction {

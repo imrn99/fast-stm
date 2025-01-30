@@ -1,3 +1,6 @@
+// regular transaction
+
+/// Error of a single step of a transaction.
 #[derive(Eq, PartialEq, Clone, Copy, Debug, thiserror::Error)]
 pub enum StmError {
     /// The call failed, because a variable, the computation
@@ -12,30 +15,32 @@ pub enum StmError {
     Retry,
 }
 
-/// `StmResult` is a result of a single step of a STM calculation.
+/// Return type of a transaction body.
 ///
-/// It informs of success or the type of failure. Normally you should not use
-/// it directly. Especially recovering from an error, e.g. by using `action1.or(action2)`
-/// can break the semantics of stm, and cause delayed wakeups or deadlocks.
+/// It is the result of a single step of a STM calculation. It informs of success or the type
+/// of failure. Normally you should not use it directly. Especially recovering from an error,
+/// e.g. by using `action1.or(action2)` can break the semantics of stm, and cause delayed
+/// wakeups or deadlocks.
 ///
 /// For the later case, there is the `transaction.or(action1, action2)`, that
 /// is safe to use.
-pub type StmResult<T> = Result<T, StmError>; // TODO: rename to StmClosureResult
+pub type StmClosureResult<T> = Result<T, StmError>;
 
+// fallible transaction
+
+/// Error of a single step of a fallible transaction.
 #[derive(Eq, PartialEq, Clone, Copy, Debug, thiserror::Error)]
 pub enum TransactionError<E> {
-    /// Failed due to [`StmError`].
+    /// Failed due to a regular [`StmError`].
     Stm(#[from] StmError),
-    /// `abort` was called.
-    ///
-    /// The transaction will be aborted and the error returned.
+    /// Failed due to manual cancelling (e.g. a call to `abort` in the transaction's body).
     Abort(E),
 }
 
-/// Result of a transaction body with potential failure.
+/// Return type of a fallible transaction body.
 pub type TransactionClosureResult<T, E> = Result<T, TransactionError<E>>;
 
-/// Result of a transaction.
+/// Result of a fallible transaction.
 ///
 /// A given transaction can finish in three different ways:
 /// - it is validated, and possibly returns an output value,

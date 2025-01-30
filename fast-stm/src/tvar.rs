@@ -14,7 +14,7 @@ use std::marker::PhantomData;
 use std::sync::atomic::{self, AtomicUsize};
 use std::sync::{Arc, Weak};
 
-use super::result::StmResult;
+use super::result::StmClosureResult;
 use super::transaction::control_block::ControlBlock;
 use super::Transaction;
 
@@ -204,7 +204,7 @@ where
     ///
     /// It is equivalent to `transaction.read(&var)`, but more
     /// convenient.
-    pub fn read(&self, transaction: &mut Transaction) -> StmResult<T> {
+    pub fn read(&self, transaction: &mut Transaction) -> StmClosureResult<T> {
         transaction.read(self)
     }
 
@@ -212,7 +212,7 @@ where
     ///
     /// It is equivalent to `transaction.write(&var, value)`, but more
     /// convenient.
-    pub fn write(&self, transaction: &mut Transaction, value: T) -> StmResult<()> {
+    pub fn write(&self, transaction: &mut Transaction, value: T) -> StmClosureResult<()> {
         transaction.write(self, value)
     }
 
@@ -229,7 +229,7 @@ where
     ///
     /// assert_eq!(var.read_atomic(), 42);
     /// ```
-    pub fn modify<F>(&self, transaction: &mut Transaction, f: F) -> StmResult<()>
+    pub fn modify<F>(&self, transaction: &mut Transaction, f: F) -> StmClosureResult<()>
     where
         F: FnOnce(T) -> T,
     {
@@ -251,7 +251,7 @@ where
     /// assert_eq!(x, 0);
     /// assert_eq!(var.read_atomic(), 42);
     /// ```
-    pub fn replace(&self, transaction: &mut Transaction, value: T) -> StmResult<T> {
+    pub fn replace(&self, transaction: &mut Transaction, value: T) -> StmClosureResult<T> {
         let old = self.read(transaction)?;
         self.write(transaction, value)?;
         Ok(old)
