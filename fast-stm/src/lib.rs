@@ -129,6 +129,25 @@ pub use transaction::TransactionControl;
 pub use tvar::TVar;
 
 #[inline]
+/// Call `abort` to abort a transaction and pass the error as the return value.
+///
+/// # Examples
+///
+/// ```
+/// # use fast_stm::*;
+/// struct MyError;
+///
+/// let execute_once: Result<u32, _> = atomically_with_err(|_| {
+///     abort(MyError)
+/// });
+///
+/// assert!(execute_once.is_err());
+/// ```
+pub fn abort<T, E>(e: E) -> TransactionClosureResult<T, E> {
+    Err(TransactionError::Abort(e))
+}
+
+#[inline]
 /// Call `retry` to abort an operation and run the whole transaction again.
 ///
 /// Semantically `retry` allows spin-lock-like behavior, but the library
@@ -154,6 +173,15 @@ where
     F: Fn(&mut Transaction) -> StmResult<T>,
 {
     Transaction::with(f)
+}
+
+/// Run a function atomically by using Software Transactional Memory.
+/// It calls to `Transaction::with_err` internally, but is more explicit.
+pub fn atomically_with_err<T, E, F>(f: F) -> Result<T, E>
+where
+    F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
+{
+    Transaction::with_err(f)
 }
 
 #[inline]

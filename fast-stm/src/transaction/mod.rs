@@ -8,6 +8,8 @@ use std::collections::BTreeMap;
 use std::mem;
 use std::sync::Arc;
 
+use crate::{TransactionClosureResult, TransactionError, TransactionResult};
+
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
 use super::result::{StmError, StmResult};
@@ -123,6 +125,107 @@ impl Transaction {
                     // on retry wait for changes
                     if let StmError::Retry = e {
                         transaction.wait_for_change();
+                    }
+                }
+            }
+
+            // clear log before retrying computation
+            transaction.clear();
+        }
+    }
+
+    /// Run a function with a transaction.
+    ///
+    /// The transaction will be retried until:
+    /// - it is validated, or
+    /// - it is explicitly aborted from the function, using the `TODO` function.
+    pub fn with_err<T, F, E>(f: F) -> Result<T, E>
+    where
+        F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
+    {
+        let _guard = TransactionGuard::new();
+
+        // create a log guard for initializing and cleaning up
+        // the log
+        let mut transaction = Transaction::new();
+
+        // loop until success
+        loop {
+            // run the computation
+            match f(&mut transaction) {
+                // on success exit loop
+                Ok(t) => {
+                    if transaction.commit() {
+                        return Ok(t);
+                    }
+                }
+                // on error,
+                Err(e) => match e {
+                    // abort and return the error
+                    TransactionError::Abort(err) => return Err(err),
+                    // retry
+                    TransactionError::Stm(_) => {
+                        transaction.wait_for_change();
+                    }
+                },
+            }
+
+            // clear log before retrying computation
+            transaction.clear();
+        }
+    }
+
+    /// Run a function with a transaction.
+    ///
+    /// `with_control` takes another control function, that
+    /// can steer the control flow and possible terminate early.
+    ///
+    /// `control` can react to counters, timeouts or external inputs.
+    ///
+    /// It allows the user to fall back to another strategy, like a global lock
+    /// in the case of too much contention.
+    ///
+    /// Please not, that the transaction may still infinitely wait for changes when `retry` is
+    /// called and `control` does not abort.
+    /// If you need a timeout, another thread should signal this through a [`TVar`].
+    pub fn with_control_and_err<T, F, C, E>(mut control: C, f: F) -> TransactionResult<T, E>
+    where
+        F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
+        C: FnMut(StmError) -> TransactionControl,
+    {
+        let _guard = TransactionGuard::new();
+
+        // create a log guard for initializing and cleaning up
+        // the log
+        let mut transaction = Transaction::new();
+
+        // loop until success
+        loop {
+            // run the computation
+            match f(&mut transaction) {
+                // on success exit loop
+                Ok(t) => {
+                    if transaction.commit() {
+                        return TransactionResult::Validated(t);
+                    }
+                }
+
+                Err(e) => {
+                    match e {
+                        TransactionError::Abort(err) => {
+                            return TransactionResult::Cancelled(err);
+                        }
+                        TransactionError::Stm(err) => {
+                            // Check if the user wants to abort the transaction.
+                            if let TransactionControl::Abort = control(err) {
+                                return TransactionResult::Failed;
+                            }
+
+                            // on retry wait for changes
+                            if let StmError::Retry = err {
+                                transaction.wait_for_change();
+                            }
+                        }
                     }
                 }
             }
