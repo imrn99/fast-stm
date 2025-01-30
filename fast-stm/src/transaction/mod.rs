@@ -218,7 +218,7 @@ impl Transaction {
                         TransactionError::Stm(err) => {
                             // Check if the user wants to abort the transaction.
                             if let TransactionControl::Abort = control(err) {
-                                return TransactionResult::Failed;
+                                return TransactionResult::Abandoned;
                             }
 
                             // on retry wait for changes

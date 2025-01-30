@@ -56,8 +56,8 @@ pub enum TransactionResult<T, E> {
     Validated(T),
     /// Transaction was manually aborted.
     Cancelled(E),
-    /// Transaction was aborted.
-    Failed,
+    /// Transaction was aorted through standard control flow.
+    Abandoned,
 }
 
 impl<T, E> TransactionResult<T, E> {
@@ -71,7 +71,7 @@ impl<T, E> TransactionResult<T, E> {
     pub fn is_validated_and(self, f: impl FnOnce(T) -> bool) -> bool {
         match self {
             Self::Validated(t) => f(t),
-            Self::Cancelled(_) | Self::Failed => false,
+            Self::Cancelled(_) | Self::Abandoned => false,
         }
     }
 
@@ -85,7 +85,7 @@ impl<T, E> TransactionResult<T, E> {
     pub fn is_cancelled_and(self, f: impl FnOnce(E) -> bool) -> bool {
         match self {
             Self::Cancelled(e) => f(e),
-            Self::Validated(_) | Self::Failed => false,
+            Self::Validated(_) | Self::Abandoned => false,
         }
     }
 
@@ -94,7 +94,7 @@ impl<T, E> TransactionResult<T, E> {
     pub fn validated(self) -> Option<T> {
         match self {
             Self::Validated(t) => Some(t),
-            Self::Cancelled(_) | Self::Failed => None,
+            Self::Cancelled(_) | Self::Abandoned => None,
         }
     }
 
@@ -103,20 +103,20 @@ impl<T, E> TransactionResult<T, E> {
     pub fn cancelled(self) -> Option<E> {
         match self {
             Self::Cancelled(e) => Some(e),
-            Self::Validated(_) | Self::Failed => None,
+            Self::Validated(_) | Self::Abandoned => None,
         }
     }
 
-    /// Returns `true` if the result is [`Failed`][Self::Failed].
+    /// Returns `true` if the result is [`Abandoned`][Self::Abandoned].
     pub fn failed(self) -> bool {
-        matches!(self, Self::Failed)
+        matches!(self, Self::Abandoned)
     }
 
     /// Returns the contained [`Validated`][Self::Validated] value, consuming `self`.
     ///
     /// # Panics
     ///
-    /// Panics if the value is a [`Cancelled`][Self::Cancelled] or [`Failed`][Self::Failed],
+    /// Panics if the value is a [`Cancelled`][Self::Cancelled] or [`Abandoned`][Self::Abandoned],
     /// with a panic message including the passed message, and the content of
     /// [`Cancelled`][Self::Cancelled] if applicable.
     pub fn expect(self, msg: &str) -> T
@@ -126,7 +126,7 @@ impl<T, E> TransactionResult<T, E> {
         match self {
             Self::Validated(t) => t,
             Self::Cancelled(e) => panic!("{msg}: {e:?}"),
-            Self::Failed => panic!("{msg}"),
+            Self::Abandoned => panic!("{msg}"),
         }
     }
 
@@ -134,7 +134,7 @@ impl<T, E> TransactionResult<T, E> {
     ///
     /// # Panics
     ///
-    /// Panics if the value is a [`Validated`][Self::Validated] or [`Failed`][Self::Failed],
+    /// Panics if the value is a [`Validated`][Self::Validated] or [`Abandoned`][Self::Abandoned],
     /// with a panic message including the passed message, and the content of
     /// [`Validated`][Self::Validated] if applicable.
     pub fn expect_err(self, msg: &str) -> E
@@ -144,7 +144,7 @@ impl<T, E> TransactionResult<T, E> {
         match self {
             Self::Validated(t) => panic!("{msg}: {t:?}"),
             Self::Cancelled(e) => e,
-            Self::Failed => panic!("{msg}"),
+            Self::Abandoned => panic!("{msg}"),
         }
     }
 
@@ -152,7 +152,7 @@ impl<T, E> TransactionResult<T, E> {
     ///
     /// # Panics
     ///
-    /// Panics if the value is a [`Cancelled`][Self::Cancelled] or [`Failed`][Self::Failed], with
+    /// Panics if the value is a [`Cancelled`][Self::Cancelled] or [`Abandoned`][Self::Abandoned], with
     /// a panic message specified by the content of [`Cancelled`][Self::Cancelled] if applicable.    
     pub fn unwrap(self) -> T
     where
@@ -163,7 +163,9 @@ impl<T, E> TransactionResult<T, E> {
             Self::Cancelled(e) => {
                 panic!("called `TransactionResult::unwrap()` on a `Cancelled` value: {e:?}")
             }
-            Self::Failed => panic!("called `TransactionResult::unwrap()` on a `Failed` value"),
+            Self::Abandoned => {
+                panic!("called `TransactionResult::unwrap()` on a `Abandoned` value")
+            }
         }
     }
 
@@ -171,7 +173,7 @@ impl<T, E> TransactionResult<T, E> {
     ///
     /// # Panics
     ///
-    /// Panics if the value is a [`Validated`][Self::Validated] or [`Failed`][Self::Failed], with
+    /// Panics if the value is a [`Validated`][Self::Validated] or [`Abandoned`][Self::Abandoned], with
     /// a panic message specified by the content of [`Validated`][Self::Validated] if applicable.    
     pub fn unwrap_err(self) -> E
     where
@@ -182,14 +184,16 @@ impl<T, E> TransactionResult<T, E> {
                 panic!("called `TransactionResult::unwrap_err()` on a `Validated` value: {t:?}")
             }
             Self::Cancelled(e) => e,
-            Self::Failed => panic!("called `TransactionResult::unwrap_err()` on a `Failed` value"),
+            Self::Abandoned => {
+                panic!("called `TransactionResult::unwrap_err()` on a `Abandoned` value")
+            }
         }
     }
 
     /// Returns the contained [`Validated`][Self::Validated] value or a default value,
     /// consuming `self`.
     ///
-    /// If the value is a [`Cancelled`][Self::Cancelled] or [`Failed`][Self::Failed], the `Default`
+    /// If the value is a [`Cancelled`][Self::Cancelled] or [`Abandoned`][Self::Abandoned], the `Default`
     /// implementation of `T` is called to return a value.    
     pub fn unwrap_or_default(self) -> T
     where
@@ -197,7 +201,7 @@ impl<T, E> TransactionResult<T, E> {
     {
         match self {
             Self::Validated(t) => t,
-            Self::Cancelled(_) | Self::Failed => Default::default(),
+            Self::Cancelled(_) | Self::Abandoned => Default::default(),
         }
     }
 }
