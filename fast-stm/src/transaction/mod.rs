@@ -213,7 +213,7 @@ impl Transaction {
                 Err(e) => {
                     match e {
                         TransactionError::Abort(err) => {
-                            return TransactionResult::Aborted(err);
+                            return TransactionResult::Cancelled(err);
                         }
                         TransactionError::Stm(err) => {
                             // Check if the user wants to abort the transaction.
