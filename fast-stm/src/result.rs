@@ -61,10 +61,13 @@ pub enum TransactionResult<T, E> {
 }
 
 impl<T, E> TransactionResult<T, E> {
+    /// Returns `true` if the result is [`Validated`][Self::Validated].
     pub fn is_validated(&self) -> bool {
         matches!(self, Self::Validated(_))
     }
 
+    /// Returns `true` if the result is [`Validated`][Self::Validated]
+    /// and the value inside of it matches a predicate.
     pub fn is_validated_and(self, f: impl FnOnce(T) -> bool) -> bool {
         match self {
             Self::Validated(t) => f(t),
@@ -72,10 +75,13 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Returns `true` if the result is [`Cancelled`][Self::Cancelled].
     pub fn is_cancelled(&self) -> bool {
         matches!(self, Self::Cancelled(_))
     }
 
+    /// Returns `true` if the result is [`Cancelled`][Self::Cancelled]
+    /// and the value inside of it matches a predicate.
     pub fn is_cancelled_and(self, f: impl FnOnce(E) -> bool) -> bool {
         match self {
             Self::Cancelled(e) => f(e),
@@ -83,6 +89,8 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Converts `self: TransactionResult<T, E>` to [`Option<T>`], consuming `self`,
+    /// and discarding the error, if any.
     pub fn validated(self) -> Option<T> {
         match self {
             Self::Validated(t) => Some(t),
@@ -90,6 +98,8 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Converts `self: TransactionResult<T, E>` to [`Option<E>`], consuming `self`,
+    /// and discarding the success value, if any.    
     pub fn cancelled(self) -> Option<E> {
         match self {
             Self::Cancelled(e) => Some(e),
@@ -97,10 +107,18 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Returns `true` if the result is [`Failed`][Self::Failed].
     pub fn failed(self) -> bool {
         matches!(self, Self::Failed)
     }
 
+    /// Returns the contained [`Validated`][Self::Validated] value, consuming `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a [`Cancelled`][Self::Cancelled] or [`Failed`][Self::Failed],
+    /// with a panic message including the passed message, and the content of
+    /// [`Cancelled`][Self::Cancelled] if applicable.
     pub fn expect(self, msg: &str) -> T
     where
         E: std::fmt::Debug,
@@ -112,6 +130,13 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Returns the contained [`Cancelled`][Self::Cancelled] error, consuming `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a [`Validated`][Self::Validated] or [`Failed`][Self::Failed],
+    /// with a panic message including the passed message, and the content of
+    /// [`Validated`][Self::Validated] if applicable.
     pub fn expect_err(self, msg: &str) -> E
     where
         T: std::fmt::Debug,
@@ -123,6 +148,12 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Returns the contained [`Validated`][Self::Validated] value, consuming `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a [`Cancelled`][Self::Cancelled] or [`Failed`][Self::Failed], with
+    /// a panic message specified by the content of [`Cancelled`][Self::Cancelled] if applicable.    
     pub fn unwrap(self) -> T
     where
         E: std::fmt::Debug,
@@ -136,6 +167,12 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Returns the contained [`Cancelled`][Self::Cancelled] error, consuming `self`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the value is a [`Validated`][Self::Validated] or [`Failed`][Self::Failed], with
+    /// a panic message specified by the content of [`Validated`][Self::Validated] if applicable.    
     pub fn unwrap_err(self) -> E
     where
         T: std::fmt::Debug,
@@ -149,6 +186,11 @@ impl<T, E> TransactionResult<T, E> {
         }
     }
 
+    /// Returns the contained [`Validated`][Self::Validated] value or a default value,
+    /// consuming `self`.
+    ///
+    /// If the value is a [`Cancelled`][Self::Cancelled] or [`Failed`][Self::Failed], the `Default`
+    /// implementation of `T` is called to return a value.    
     pub fn unwrap_or_default(self) -> T
     where
         T: Default,
