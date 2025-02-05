@@ -176,8 +176,8 @@ pub use tvar::TVar;
 macro_rules! try_or_coerce {
     ($op: expr, $to: ident) => {
         $op.map_err(|e| match e {
-            $crate::TransactionError::Abort(e) => fast_stm::TransactionError::Abort($to::from(e)),
-            $crate::TransactionError::Stm(e) => fast_stm::TransactionError::Stm(e),
+            $crate::TransactionError::Abort(e) => $crate::TransactionError::Abort($to::from(e)),
+            $crate::TransactionError::Stm(e) => $crate::TransactionError::Stm(e),
         })?
     };
 }
