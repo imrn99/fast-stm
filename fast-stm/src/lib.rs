@@ -128,6 +128,60 @@ pub use transaction::Transaction;
 pub use transaction::TransactionControl;
 pub use tvar::TVar;
 
+/// Convert a `TransactionClosureResult<T, E_A>` to `TransactionClosureResult<T, E_B>`.
+///
+/// This macro is used to cleanly write transactions where multiple kind of errors are
+/// possible during execution. The macro will not fail as long as the specified target
+/// error `$to` implements `From<E>`, `E` being the error possibly returned by `$op`.
+/// It expands to:
+///
+/// ```ignore
+/// $op.map_err(|e| match e {
+///         fast_stm::TransactionError::Abort(e) => fast_stm::TransactionError::Abort($to::from(e)),
+///         fast_stm::TransactionError::Stm(e) => fast_stm::TransactionError::Stm(e),
+///     })?
+/// ```
+///
+/// # Example
+///
+/// ```rust
+/// # use fast_stm::{abort, atomically_with_err, try_or_coerce, Transaction, TransactionClosureResult};
+///
+/// struct Error1;
+/// struct Error2;
+///
+/// impl From<Error1> for Error2 {
+///     fn from(e: Error1) -> Self {
+///         Error2
+///     }
+/// }
+///
+/// fn op1(trans: &mut Transaction) -> TransactionClosureResult<(), Error1> {
+///     // ...
+///     Ok(())
+/// }
+///
+/// fn op2(trans: &mut Transaction) -> TransactionClosureResult<(), Error2> {
+///     // ...
+///     Ok(())
+/// }
+///
+/// let res: Result<(), Error2> = atomically_with_err(|trans| {
+///     try_or_coerce!(op1(trans), Error2);
+///     op2(trans)?;   
+///     Ok(())
+/// });
+/// ```
+#[macro_export]
+macro_rules! try_or_coerce {
+    ($op: expr, $to: ident) => {
+        $op.map_err(|e| match e {
+            $crate::TransactionError::Abort(e) => $crate::TransactionError::Abort($to::from(e)),
+            $crate::TransactionError::Stm(e) => $crate::TransactionError::Stm(e),
+        })?
+    };
+}
+
 #[inline]
 /// Call `abort` to abort a transaction and pass the error as the return value.
 ///
