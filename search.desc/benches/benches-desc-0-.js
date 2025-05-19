@@ -1,0 +1,1 @@
+searchState.loadedDescShard("benches", 0, "<code>fast-stm</code> benchmarks")
