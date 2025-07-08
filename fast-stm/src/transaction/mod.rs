@@ -1,4 +1,3 @@
-pub mod control_block;
 pub mod log_var;
 
 use std::any::Any;
@@ -10,7 +9,6 @@ use std::sync::Arc;
 
 use crate::{TransactionClosureResult, TransactionError, TransactionResult};
 
-use self::control_block::ControlBlock;
 use self::log_var::LogVar;
 use super::result::{StmClosureResult, StmError};
 use super::tvar::{TVar, VarControlBlock};
@@ -124,7 +122,7 @@ impl Transaction {
 
                     // on retry wait for changes
                     if let StmError::Retry = e {
-                        transaction.wait_for_change();
+                        continue;
                     }
                 }
             }
@@ -165,7 +163,7 @@ impl Transaction {
                     TransactionError::Abort(err) => return Err(err),
                     // retry
                     TransactionError::Stm(_) => {
-                        transaction.wait_for_change();
+                        continue;
                     }
                 },
             }
@@ -223,7 +221,7 @@ impl Transaction {
 
                             // on retry wait for changes
                             if let StmError::Retry = err {
-                                transaction.wait_for_change();
+                                continue;
                             }
                         }
                     }
@@ -362,46 +360,6 @@ impl Transaction {
         self.vars.clear();
     }
 
-    /// Wait for any variable to change,
-    /// because the change may lead to a new calculation result.
-    fn wait_for_change(&mut self) {
-        // Create control block for waiting.
-        let ctrl = Arc::new(ControlBlock::new());
-
-        #[allow(clippy::mutable_key_type)]
-        let vars = std::mem::take(&mut self.vars);
-        let mut reads = Vec::with_capacity(self.vars.len());
-
-        let blocking = vars
-            .into_iter()
-            .filter_map(|(a, b)| b.into_read_value().map(|b| (a, b)))
-            // Check for consistency.
-            .all(|(var, value)| {
-                var.wait(&ctrl);
-                let x = {
-                    // Take read lock and read value.
-                    let guard = var.value.read();
-                    Arc::ptr_eq(&value, &guard)
-                };
-                reads.push(var);
-                x
-            });
-
-        // If no var has changed, then block.
-        if blocking {
-            // Propably wait until one var has changed.
-            ctrl.wait();
-        }
-
-        // Let others know that ctrl is dead.
-        // It does not matter, if we set too many
-        // to dead since it may slightly reduce performance
-        // but not break the semantics.
-        for var in &reads {
-            var.set_dead();
-        }
-    }
-
     /// Write the log back to the variables.
     ///
     /// Return true for success and false, if a read var has changed
@@ -474,11 +432,6 @@ impl Transaction {
         for (value, mut lock) in write_vec {
             // Commit value.
             *lock = value.clone();
-        }
-
-        for var in written {
-            // Unblock all threads waiting for it.
-            var.wake_all();
         }
 
         // Commit succeded.

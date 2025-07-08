@@ -6,16 +6,14 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use std::any::Any;
 use std::cmp;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
-use std::sync::atomic::{self, AtomicUsize};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
 
 use super::result::StmClosureResult;
-use super::transaction::control_block::ControlBlock;
 use super::Transaction;
 
 /// `VarControlBlock` contains all the useful data for a `Var` while beeing the same type.
@@ -23,16 +21,6 @@ use super::Transaction;
 /// The control block is accessed from other threads directly whereas `Var`
 /// is just a typesafe wrapper around it.
 pub struct VarControlBlock {
-    /// `waiting_threads` is a list of all waiting threads protected by a mutex.
-    waiting_threads: Mutex<Vec<Weak<ControlBlock>>>,
-
-    /// `dead_threads` is a counter for all dead threads.
-    ///
-    /// When there are many dead threads waiting for a change, but
-    /// nobody changes the value, then an automatic collection is
-    /// performed.
-    dead_threads: AtomicUsize,
-
     /// The inner value of the Var.
     ///
     /// It can be shared through a Arc without copying it too often.
@@ -57,62 +45,9 @@ impl VarControlBlock {
     where
         T: Any + Sync + Send,
     {
-        let ctrl = VarControlBlock {
-            waiting_threads: Mutex::new(Vec::new()),
-            dead_threads: AtomicUsize::new(0),
+        Arc::new(VarControlBlock {
             value: RwLock::new(Arc::new(val)),
-        };
-        Arc::new(ctrl)
-    }
-
-    /// Wake all threads that are waiting for this block.
-    pub fn wake_all(&self) {
-        // Atomically take all waiting threads from the value.
-        let threads = {
-            let mut guard = self.waiting_threads.lock();
-            let inner: &mut Vec<_> = &mut guard;
-            std::mem::take(inner)
-        };
-
-        // Take all, that are still alive.
-        let threads = threads.iter().filter_map(Weak::upgrade);
-
-        // Release all the semaphores to start the thread.
-        for thread in threads {
-            // Inform thread that this var has changed.
-            thread.set_changed();
-        }
-    }
-
-    /// Add another thread, that waits for mutations of `self`.
-    pub fn wait(&self, thread: &Arc<ControlBlock>) {
-        let mut guard = self.waiting_threads.lock();
-
-        guard.push(Arc::downgrade(thread));
-    }
-
-    /// Mark another `StmControlBlock` as dead.
-    ///
-    /// If the count of dead control blocks is too high,
-    /// perform a cleanup.
-    /// This prevents masses of old `StmControlBlock` to
-    /// pile up when a variable is often read but rarely written.
-    pub fn set_dead(&self) {
-        // Increase by one.
-        let deads = self.dead_threads.fetch_add(1, atomic::Ordering::Relaxed);
-
-        // If there are too many then cleanup.
-
-        // There is a potential data race that may occure when
-        // one thread reads the number and then operates on
-        // outdated data, but no serious mistakes may happen.
-        if deads >= 64 {
-            let mut guard = self.waiting_threads.lock();
-            self.dead_threads.store(0, atomic::Ordering::SeqCst);
-
-            // Remove all dead ones. Possibly free up the memory.
-            guard.retain(|t| t.upgrade().is_some());
-        }
+        })
     }
 
     fn get_address(&self) -> usize {
