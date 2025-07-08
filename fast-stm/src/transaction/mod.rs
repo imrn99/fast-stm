@@ -99,8 +99,7 @@ impl Transaction {
     {
         let _guard = TransactionGuard::new();
 
-        // create a log guard for initializing and cleaning up
-        // the log
+        // create a log guard for initializing and cleaning up the log
         let mut transaction = Transaction::new();
 
         // loop until success
@@ -120,10 +119,8 @@ impl Transaction {
                         return None;
                     }
 
-                    // on retry wait for changes
-                    if let StmError::Retry = e {
-                        continue;
-                    }
+                    // retry
+                    if let StmError::Retry = e {}
                 }
             }
 
@@ -143,8 +140,7 @@ impl Transaction {
     {
         let _guard = TransactionGuard::new();
 
-        // create a log guard for initializing and cleaning up
-        // the log
+        // create a log guard for initializing and cleaning up the log
         let mut transaction = Transaction::new();
 
         // loop until success
@@ -161,10 +157,8 @@ impl Transaction {
                 Err(e) => match e {
                     // abort and return the error
                     TransactionError::Abort(err) => return Err(err),
-                    // retry
-                    TransactionError::Stm(_) => {
-                        continue;
-                    }
+                    // continue
+                    TransactionError::Stm(_) => {}
                 },
             }
 
@@ -193,8 +187,7 @@ impl Transaction {
     {
         let _guard = TransactionGuard::new();
 
-        // create a log guard for initializing and cleaning up
-        // the log
+        // create a log guard for initializing and cleaning up the log
         let mut transaction = Transaction::new();
 
         // loop until success
@@ -219,10 +212,8 @@ impl Transaction {
                                 return TransactionResult::Abandoned;
                             }
 
-                            // on retry wait for changes
-                            if let StmError::Retry = err {
-                                continue;
-                            }
+                            // continue
+                            if let StmError::Retry = err {}
                         }
                     }
                 }
