@@ -2,8 +2,8 @@ pub mod log_var;
 
 use std::any::Any;
 use std::cell::Cell;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::mem;
 use std::sync::Arc;
 
@@ -52,7 +52,7 @@ pub struct Transaction {
     /// The `VarControlBlock` is unique because it uses it's address for comparing.
     ///
     /// The logs need to be accessed in a order to prevend dead-locks on locking.
-    vars: BTreeMap<Arc<VarControlBlock>, LogVar>,
+    vars: HashMap<*const VarControlBlock, LogVar>,
 }
 
 impl Transaction {
@@ -62,7 +62,7 @@ impl Transaction {
     /// Use `atomically` instead.
     fn new() -> Transaction {
         Transaction {
-            vars: BTreeMap::new(),
+            vars: HashMap::new(),
         }
     }
 
@@ -244,7 +244,7 @@ impl Transaction {
     pub fn read<T: Send + Sync + Any + Clone>(&mut self, var: &TVar<T>) -> StmClosureResult<T> {
         let ctrl = var.control_block().clone();
         // Check if the same var was written before.
-        let value = match self.vars.entry(ctrl) {
+        let value = match self.vars.entry(Arc::as_ptr(&ctrl)) {
             // If the variable has been accessed before, then load that value.
             Entry::Occupied(mut entry) => entry.get_mut().read(),
 
@@ -278,7 +278,7 @@ impl Transaction {
         // new control block
         let ctrl = var.control_block().clone();
         // update or create new entry
-        match self.vars.entry(ctrl) {
+        match self.vars.entry(Arc::as_ptr(&ctrl)) {
             Entry::Occupied(mut entry) => entry.get_mut().write(boxed),
             Entry::Vacant(entry) => {
                 entry.insert(LogVar::Write(boxed));
@@ -373,6 +373,7 @@ impl Transaction {
 
         for (var, value) in &self.vars {
             // lock the variable and read the value
+            let var = unsafe { var.as_ref() }.expect("E: unreachabel");
 
             match *value {
                 // We need to take a write lock.
