@@ -257,7 +257,17 @@ impl Transaction {
         // Check if the same var was written before.
         let value = match self.vars.entry(ctrl) {
             // If the variable has been accessed before, then load that value.
-            Entry::Occupied(mut entry) => entry.get_mut().read(),
+            Entry::Occupied(mut entry) => {
+                let log = entry.get_mut();
+                // if we previously read the var, check for value change
+                if let LogVar::Read(v) = log {
+                    let crt_v = var.read_ref_atomic();
+                    if !Arc::ptr_eq(&v, &crt_v) {
+                        return Err(StmError::Failure);
+                    }
+                }
+                log.read()
+            }
 
             // Else load the variable statically.
             Entry::Vacant(entry) => {
