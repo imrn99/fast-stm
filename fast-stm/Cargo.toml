@@ -12,6 +12,7 @@ description.workspace = true
 authors.workspace = true
 
 [dependencies]
+rustc-hash = { workspace = true }
 parking_lot = { workspace = true }
 thiserror = { workspace = true }
 

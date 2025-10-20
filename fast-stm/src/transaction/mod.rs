@@ -3,9 +3,11 @@ pub mod log_var;
 use std::any::Any;
 use std::cell::Cell;
 use std::collections::hash_map::Entry;
-use std::collections::HashMap;
+// use std::collections::HashMap;
 use std::mem;
 use std::sync::Arc;
+
+use rustc_hash::FxHashMap;
 
 use crate::{TransactionClosureResult, TransactionError, TransactionResult};
 
@@ -52,7 +54,7 @@ pub struct Transaction {
     /// The `VarControlBlock` is unique because it uses it's address for comparing.
     ///
     /// The logs need to be accessed in a order to prevend dead-locks on locking.
-    vars: HashMap<*const VarControlBlock, LogVar>,
+    vars: FxHashMap<*const VarControlBlock, LogVar>,
 }
 
 impl Transaction {
@@ -62,7 +64,7 @@ impl Transaction {
     /// Use `atomically` instead.
     fn new() -> Transaction {
         Transaction {
-            vars: HashMap::new(),
+            vars: FxHashMap::default(),
         }
     }
 
