@@ -6,15 +6,21 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use parking_lot::{Mutex, RwLock};
+#[cfg(feature = "wait-on-retry")]
+use parking_lot::Mutex;
+use parking_lot::RwLock;
 use std::any::Any;
 use std::cmp;
 use std::fmt::{self, Debug};
 use std::marker::PhantomData;
+#[cfg(feature = "wait-on-retry")]
 use std::sync::atomic::{self, AtomicUsize};
-use std::sync::{Arc, Weak};
+use std::sync::Arc;
+#[cfg(feature = "wait-on-retry")]
+use std::sync::Weak;
 
 use super::result::StmClosureResult;
+#[cfg(feature = "wait-on-retry")]
 use super::transaction::control_block::ControlBlock;
 use super::Transaction;
 
@@ -24,6 +30,7 @@ use super::Transaction;
 /// is just a typesafe wrapper around it.
 pub struct VarControlBlock {
     /// `waiting_threads` is a list of all waiting threads protected by a mutex.
+    #[cfg(feature = "wait-on-retry")]
     waiting_threads: Mutex<Vec<Weak<ControlBlock>>>,
 
     /// `dead_threads` is a counter for all dead threads.
@@ -31,6 +38,7 @@ pub struct VarControlBlock {
     /// When there are many dead threads waiting for a change, but
     /// nobody changes the value, then an automatic collection is
     /// performed.
+    #[cfg(feature = "wait-on-retry")]
     dead_threads: AtomicUsize,
 
     /// The inner value of the Var.
@@ -52,6 +60,7 @@ pub struct VarControlBlock {
 }
 
 impl VarControlBlock {
+    #[cfg(feature = "wait-on-retry")]
     /// create a new empty `VarControlBlock`
     pub fn new<T>(val: T) -> Arc<VarControlBlock>
     where
@@ -65,6 +74,19 @@ impl VarControlBlock {
         Arc::new(ctrl)
     }
 
+    #[cfg(not(feature = "wait-on-retry"))]
+    /// create a new empty `VarControlBlock`
+    pub fn new<T>(val: T) -> Arc<VarControlBlock>
+    where
+        T: Any + Sync + Send,
+    {
+        let ctrl = VarControlBlock {
+            value: RwLock::new(Arc::new(val)),
+        };
+        Arc::new(ctrl)
+    }
+
+    #[cfg(feature = "wait-on-retry")]
     /// Wake all threads that are waiting for this block.
     pub fn wake_all(&self) {
         // Atomically take all waiting threads from the value.
@@ -84,6 +106,7 @@ impl VarControlBlock {
         }
     }
 
+    #[cfg(feature = "wait-on-retry")]
     /// Add another thread, that waits for mutations of `self`.
     pub fn wait(&self, thread: &Arc<ControlBlock>) {
         let mut guard = self.waiting_threads.lock();
@@ -91,6 +114,7 @@ impl VarControlBlock {
         guard.push(Arc::downgrade(thread));
     }
 
+    #[cfg(feature = "wait-on-retry")]
     /// Mark another `StmControlBlock` as dead.
     ///
     /// If the count of dead control blocks is too high,

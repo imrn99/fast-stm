@@ -1,3 +1,4 @@
+#[cfg(feature = "wait-on-retry")]
 pub mod control_block;
 pub mod log_var;
 
@@ -10,6 +11,7 @@ use std::sync::Arc;
 
 use crate::{TransactionClosureResult, TransactionError, TransactionResult};
 
+#[cfg(feature = "wait-on-retry")]
 use self::control_block::ControlBlock;
 use self::log_var::LogVar;
 use super::result::{StmClosureResult, StmError};
@@ -123,6 +125,7 @@ impl Transaction {
                     }
 
                     // on retry wait for changes
+                    #[cfg(feature = "wait-on-retry")]
                     if let StmError::Retry = e {
                         transaction.wait_for_change();
                     }
@@ -165,6 +168,7 @@ impl Transaction {
                     TransactionError::Abort(err) => return Err(err),
                     // retry
                     TransactionError::Stm(_) => {
+                        #[cfg(feature = "wait-on-retry")]
                         transaction.wait_for_change();
                     }
                 },
@@ -222,6 +226,7 @@ impl Transaction {
                             }
 
                             // on retry wait for changes
+                            #[cfg(feature = "wait-on-retry")]
                             if let StmError::Retry = err {
                                 transaction.wait_for_change();
                             }
@@ -364,6 +369,7 @@ impl Transaction {
 
     /// Wait for any variable to change,
     /// because the change may lead to a new calculation result.
+    #[cfg(feature = "wait-on-retry")]
     fn wait_for_change(&mut self) {
         // Create control block for waiting.
         let ctrl = Arc::new(ControlBlock::new());
@@ -476,6 +482,7 @@ impl Transaction {
             *lock = value.clone();
         }
 
+        #[cfg(feature = "wait-on-retry")]
         for var in written {
             // Unblock all threads waiting for it.
             var.wake_all();
