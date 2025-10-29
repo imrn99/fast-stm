@@ -13,10 +13,14 @@ authors.workspace = true
 
 [features]
 default = ["wait-on-retry"]
+
+hash-registers = ["dep:rustc-hash"]
 wait-on-retry = []
 
 [dependencies]
+cfg-if = { workspace = true }
 parking_lot = { workspace = true }
+rustc-hash = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
 [build-dependencies]
