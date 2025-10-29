@@ -11,7 +11,10 @@ keywords.workspace = true
 description.workspace = true
 authors.workspace = true
 
+[features]
+default = ["wait-on-retry"]
+wait-on-retry = []
+
 [dependencies]
 parking_lot = { workspace = true }
 thiserror = { workspace = true }
-

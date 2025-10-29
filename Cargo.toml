@@ -1,9 +1,6 @@
 [workspace]
 resolver = "2"
-members = [
-    "fast-stm",
-    "benches"
-]
+members = ["fast-stm", "benches"]
 
 [workspace.package]
 version = "0.5.0"
@@ -19,8 +16,8 @@ Performance-focused implementation of software transactional memory.
 Allows composable atomic operations.
 """
 authors = [
-    "Isaie Muron <github@imrn.fr>",
-    "Marthog <Marthog@users.noreply.github.com>"
+  "Isaie Muron <github@imrn.fr>",
+  "Marthog <Marthog@users.noreply.github.com>",
 ]
 
 [workspace.dependencies]
