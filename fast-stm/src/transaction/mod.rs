@@ -4,10 +4,22 @@ pub mod log_var;
 
 use std::any::Any;
 use std::cell::Cell;
-use std::collections::btree_map::Entry;
-use std::collections::BTreeMap;
+// #[cfg(feature = "hash-registers")]
+// use std::collections::hash_map::Entry;
+// #[cfg(not(feature = "hash-registers"))]
+// use std::collections::{btree_map::Entry, BTreeMap};
+cfg_if::cfg_if! {
+    if #[cfg(feature = "hash-registers")] {
+        use std::collections::hash_map::Entry;
+    } else {
+        use std::collections::{btree_map::Entry, BTreeMap};
+    }
+}
 use std::mem;
 use std::sync::Arc;
+
+#[cfg(feature = "hash-registers")]
+use rustc_hash::FxHashMap;
 
 use crate::{TransactionClosureResult, TransactionError, TransactionResult};
 
@@ -56,7 +68,10 @@ pub struct Transaction {
     /// The `VarControlBlock` is unique because it uses it's address for comparing.
     ///
     /// The logs need to be accessed in a order to prevend dead-locks on locking.
+    #[cfg(not(feature = "hash-registers"))]
     vars: BTreeMap<Arc<VarControlBlock>, LogVar>,
+    #[cfg(feature = "hash-registers")]
+    vars: FxHashMap<*const VarControlBlock, LogVar>,
 }
 
 impl Transaction {
@@ -66,7 +81,10 @@ impl Transaction {
     /// Use `atomically` instead.
     fn new() -> Transaction {
         Transaction {
+            #[cfg(not(feature = "hash-registers"))]
             vars: BTreeMap::new(),
+            #[cfg(feature = "hash-registers")]
+            vars: FxHashMap::default(),
         }
     }
 
@@ -260,7 +278,11 @@ impl Transaction {
     pub fn read<T: Send + Sync + Any + Clone>(&mut self, var: &TVar<T>) -> StmClosureResult<T> {
         let ctrl = var.control_block().clone();
         // Check if the same var was written before.
-        let value = match self.vars.entry(ctrl) {
+        #[cfg(not(feature = "hash-registers"))]
+        let key = ctrl;
+        #[cfg(feature = "hash-registers")]
+        let key = Arc::as_ptr(&ctrl);
+        let value = match self.vars.entry(key) {
             // If the variable has been accessed before, then load that value.
             Entry::Occupied(mut entry) => entry.get_mut().read(),
 
@@ -294,7 +316,11 @@ impl Transaction {
         // new control block
         let ctrl = var.control_block().clone();
         // update or create new entry
-        match self.vars.entry(ctrl) {
+        #[cfg(not(feature = "hash-registers"))]
+        let key = ctrl;
+        #[cfg(feature = "hash-registers")]
+        let key = Arc::as_ptr(&ctrl);
+        match self.vars.entry(key) {
             Entry::Occupied(mut entry) => entry.get_mut().write(boxed),
             Entry::Vacant(entry) => {
                 entry.insert(LogVar::Write(boxed));
@@ -383,6 +409,8 @@ impl Transaction {
             .filter_map(|(a, b)| b.into_read_value().map(|b| (a, b)))
             // Check for consistency.
             .all(|(var, value)| {
+                #[cfg(feature = "hash-registers")]
+                let var = unsafe { var.as_ref() }.expect("E: unreachabel");
                 var.wait(&ctrl);
                 let x = {
                     // Take read lock and read value.
@@ -428,8 +456,19 @@ impl Transaction {
         // vector of written variables
         let mut written = Vec::with_capacity(self.vars.len());
 
-        for (var, value) in &self.vars {
+        #[cfg(feature = "hash-registers")]
+        let records = {
+            let mut recs: Vec<_> = self.vars.iter().collect();
+            recs.sort_by(|(k1, _), (k2, _)| k1.cmp(&k2));
+            recs
+        };
+        #[cfg(not(feature = "hash-registers"))]
+        let records = &self.vars;
+
+        for (var, value) in records {
             // lock the variable and read the value
+            #[cfg(feature = "hash-registers")]
+            let var = unsafe { var.as_ref() }.expect("E: unreachabel");
 
             match *value {
                 // We need to take a write lock.
