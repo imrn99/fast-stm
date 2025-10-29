@@ -10,8 +10,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build_crates:
-    name: Build crates for ${{ matrix.os }}
+  build_all_feats:
+    name: Build for ${{ matrix.os }} (all features)
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
@@ -22,10 +22,9 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build main crate
-        run: cargo build -p fast-stm
-  build_examples:
-    name: Build examples for ${{ matrix.os }}
+      - run: cargo build --all-targets --all-features
+  build_no_feats:
+    name: Build for ${{ matrix.os }} (no features)
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
@@ -36,19 +35,4 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - name: Build examples
-        run: cargo build --examples
-  build_benchmarks:
-    name: Build benchmarks for ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [ ubuntu-latest, macos-latest, windows-latest ]
-    runs-on: ${{ matrix.os }}
-    steps:
-      - uses: actions/checkout@v5
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Build benchmarks
-        run: cargo build --benches
+      - run: cargo build --all-targets --no-default-features
