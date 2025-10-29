@@ -65,7 +65,7 @@ impl LogVar {
                 val = v.clone();
                 this = Self::Read(v.clone());
             }
-        };
+        }
         *self = this;
         val
     }
