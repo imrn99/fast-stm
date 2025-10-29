@@ -107,6 +107,9 @@
 //! keep the amount of accessed variables as low as needed.
 //!
 
+// document features
+#![allow(unexpected_cfgs)]
+#![cfg_attr(nightly, feature(doc_cfg))]
 // Extra linting with exceptions
 #![warn(clippy::pedantic)]
 #![allow(clippy::missing_errors_doc)]

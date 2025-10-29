@@ -18,3 +18,6 @@ wait-on-retry = []
 [dependencies]
 parking_lot = { workspace = true }
 thiserror = { workspace = true }
+
+[build-dependencies]
+rustversion.workspace = true
