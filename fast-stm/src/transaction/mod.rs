@@ -284,17 +284,20 @@ impl Transaction {
         let key = Arc::as_ptr(&ctrl);
         let value = match self.vars.entry(key) {
             // If the variable has been accessed before, then load that value.
+            #[cfg(feature = "early-conflict-detection")]
             Entry::Occupied(mut entry) => {
                 let log = entry.get_mut();
                 // if we previously read the var, check for value change
                 if let LogVar::Read(v) = log {
                     let crt_v = var.read_ref_atomic();
-                    if !Arc::ptr_eq(&v, &crt_v) {
+                    if !Arc::ptr_eq(v, &crt_v) {
                         return Err(StmError::Failure);
                     }
                 }
                 log.read()
             }
+            #[cfg(not(feature = "early-conflict-detection"))]
+            Entry::Occupied(mut entry) => entry.get_mut().read(),
 
             // Else load the variable statically.
             Entry::Vacant(entry) => {
@@ -307,7 +310,6 @@ impl Transaction {
             }
         };
 
-        // For now always succeeds, but that may change later.
         Ok(Transaction::downcast(value))
     }
 
