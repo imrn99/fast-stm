@@ -14,6 +14,7 @@ authors.workspace = true
 [features]
 default = ["wait-on-retry"]
 
+early-conflict-detection = []
 hash-registers = ["dep:rustc-hash"]
 wait-on-retry = []
 
