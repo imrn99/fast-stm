@@ -24,6 +24,24 @@
 //! Panicing within STM does not poison the `TVar`s. STM ensures consistency by
 //! never committing on panic.
 //!
+//! # Features
+//!
+//! This library has features that can be used to tweak the behavior of the implementation:
+//!
+//! - `early-conflict-detection` -- when reading a variable that was already read before in a
+//!   transaction, check if the value has changed to detect inconsistency before the commit routine
+//! - `hash-registers` -- implement internal read and write registers using a `HashMap` instead of
+//!   a `BTreeMap`
+//!   - this may lead to improved performance if your transactions are longer / read-heavy, due to
+//!     lookup computational complexity
+//!   - the hash algorithm is provided by the `rustc-hash` crate, not the `std`
+//! - `wait-on-retry` -- if `retry` is called explictly in a transaction, the thread will go to
+//!   sleep and wait for one of the variables read in the initial transaction to change before
+//!   re-attempting computation
+//!
+//! By default, only the `wait-on-retry` feature is enabled, to keep the behavior identical to the
+//! original library.
+//!
 //! # Usage
 //!
 //! You should only use the functions that are transaction-safe.
