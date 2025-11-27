@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["fast-stm", "benches"]
+members = ["fast-stm", "light-stm", "benches"]
 
 [workspace.package]
 version = "0.6.0"
@@ -23,6 +23,7 @@ authors = [
 [workspace.dependencies]
 # members
 fast-stm = { version = "0.6.0", path = "./fast-stm" }
+light-stm = { version = "0.6.0", path = "./light-stm" }
 
 # external
 cfg-if = "1.0.4"

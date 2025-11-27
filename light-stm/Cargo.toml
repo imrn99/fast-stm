@@ -1,0 +1,24 @@
+[package]
+name = "light-stm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+categories.workspace = true
+keywords.workspace = true
+description.workspace = true
+authors.workspace = true
+
+[features]
+hash-registers = ["dep:rustc-hash"]
+
+[dependencies]
+cfg-if = { workspace = true }
+parking_lot = { workspace = true }
+rustc-hash = { workspace = true, optional = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+rustversion.workspace = true
