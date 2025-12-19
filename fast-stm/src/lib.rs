@@ -285,6 +285,15 @@ pub fn unwrap_or_retry<T>(option: Option<T>) -> StmClosureResult<T> {
 }
 
 #[inline]
+/// Unwrap `Option` or call abort if it is `None`.
+pub fn unwrap_or_abort<T, E>(option: Option<T>, e: E) -> TransactionClosureResult<T, E> {
+    match option {
+        Some(x) => Ok(x),
+        None => abort(e),
+    }
+}
+
+#[inline]
 /// Retry until `cond` is true.
 ///
 /// # Example
