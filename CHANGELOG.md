@@ -1,5 +1,17 @@
 # CHANGELOG
 
+## 0.6.1
+
+### New
+
+* add `unwrap_or_abort` helper function
+
+### Changed
+
+* (repo) replace `shell.nix` file with flake
+
+---
+
 ## 0.6.0
 
 ### New
