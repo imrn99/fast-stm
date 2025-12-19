@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["StmError","TransactionControl","TransactionError","TransactionResult"],"fn":["abort","atomically","atomically_with_err","guard","optionally","retry","unwrap_or_abort","unwrap_or_retry"],"macro":["try_or_coerce"],"struct":["TVar","Transaction"],"type":["StmClosureResult","TransactionClosureResult"]};
