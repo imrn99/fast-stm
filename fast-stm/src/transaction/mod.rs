@@ -17,7 +17,6 @@ cfg_if::cfg_if! {
 use std::cell::Cell;
 cfg_if::cfg_if! {
     if #[cfg(feature = "hash-registers")] {
-        use std::collections::hash_map::Entry;
         use rustc_hash::FxHashMap;
     } else {
         use std::{collections::BTreeMap, sync::Arc};

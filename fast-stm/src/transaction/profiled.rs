@@ -3,7 +3,7 @@ cfg_if::cfg_if! {
     if #[cfg(feature = "hash-registers")] {
         use std::collections::hash_map::Entry;
     } else {
-        use std::collections::{btree_map::Entry, BTreeMap};
+        use std::collections::{btree_map::Entry};
     }
 }
 use std::mem;
@@ -65,10 +65,7 @@ impl Transaction<'_> {
     /// Use `atomically` instead.
     fn new(tallies: &mut TransactionTallies) -> Transaction<'_> {
         Transaction {
-            #[cfg(not(feature = "hash-registers"))]
-            vars: BTreeMap::new(),
-            #[cfg(feature = "hash-registers")]
-            vars: FxHashMap::default(),
+            vars: RegisterType::default(),
             tallies,
         }
     }
