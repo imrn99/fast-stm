@@ -20,12 +20,12 @@ use super::{RegisterType, TransactionGuard};
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct TransactionTallies {
-    n_attempts: u32,
-    n_retry: u32,
-    n_error: u32,
-    n_read: u32,
-    n_redundant_read: u32,
-    n_write: u32,
+    pub n_attempts: u32,
+    pub n_retry: u32,
+    pub n_error: u32,
+    pub n_read: u32,
+    pub n_redundant_read: u32,
+    pub n_write: u32,
 }
 
 /// Run a function atomically by using Software Transactional Memory.
