@@ -8,9 +8,9 @@ pub mod regular;
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "profiling")] {
-        pub use profiled::{Transaction, TransactionTallies, atomically, atomically_with_err};
+        pub use profiled::{atomically, atomically_with_err, profile_atomically, profile_atomically_with_err, Transaction, TransactionTallies};
     } else {
-        pub use regular::{Transaction, atomically, atomically_with_err};
+        pub use regular::{atomically, atomically_with_err, Transaction};
     }
 }
 

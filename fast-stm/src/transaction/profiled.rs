@@ -30,7 +30,25 @@ pub struct TransactionTallies {
 
 /// Run a function atomically by using Software Transactional Memory.
 /// It calls to `Transaction::with` internally, but is more explicit.
-pub fn atomically<T, F>(t: &mut TransactionTallies, f: F) -> T
+pub fn atomically<T, F>(f: F) -> T
+where
+    F: Fn(&mut Transaction) -> StmClosureResult<T>,
+{
+    Transaction::with(&mut TransactionTallies::default(), f)
+}
+
+/// Run a function atomically by using Software Transactional Memory.
+/// It calls to `Transaction::with_err` internally, but is more explicit.
+pub fn atomically_with_err<T, E, F>(f: F) -> Result<T, E>
+where
+    F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
+{
+    Transaction::with_err(&mut TransactionTallies::default(), f)
+}
+
+/// Run a function atomically by using Software Transactional Memory.
+/// It calls to `Transaction::with` internally, but is more explicit.
+pub fn profile_atomically<T, F>(t: &mut TransactionTallies, f: F) -> T
 where
     F: Fn(&mut Transaction) -> StmClosureResult<T>,
 {
@@ -39,7 +57,7 @@ where
 
 /// Run a function atomically by using Software Transactional Memory.
 /// It calls to `Transaction::with_err` internally, but is more explicit.
-pub fn atomically_with_err<T, E, F>(t: &mut TransactionTallies, f: F) -> Result<T, E>
+pub fn profile_atomically_with_err<T, E, F>(t: &mut TransactionTallies, f: F) -> Result<T, E>
 where
     F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
 {
