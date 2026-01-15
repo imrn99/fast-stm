@@ -25,6 +25,7 @@ pub struct TransactionTallies {
     pub n_error: u32,
     pub n_read: u32,
     pub n_redundant_read: u32,
+    pub n_read_after_write: u32,
     pub n_write: u32,
 }
 
@@ -321,20 +322,26 @@ impl Transaction<'_> {
             // If the variable has been accessed before, then load that value.
             #[cfg(feature = "early-conflict-detection")]
             Entry::Occupied(mut entry) => {
-                self.tallies.n_redundant_read += 1;
                 let log = entry.get_mut();
                 // if we previously read the var, check for value change
                 if let LogVar::Read(v) = log {
+                    self.tallies.n_redundant_read += 1;
                     let crt_v = var.read_ref_atomic();
                     if !Arc::ptr_eq(v, &crt_v) {
                         return Err(StmError::Failure);
                     }
+                } else if let LogVar::Write(_) = log {
+                    self.tallies.n_read_after_write += 1;
                 }
                 log.read()
             }
             #[cfg(not(feature = "early-conflict-detection"))]
             Entry::Occupied(mut entry) => {
-                self.tallies.n_redundant_read += 1;
+                if let LogVar::Read(_) = log {
+                    self.tallies.n_redundant_read += 1;
+                } else if let LogVar::Write(_) = log {
+                    self.tallies.n_read_after_write += 1;
+                }
                 entry.get_mut().read()
             }
 
