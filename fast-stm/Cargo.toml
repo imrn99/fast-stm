@@ -16,6 +16,7 @@ default = ["wait-on-retry"]
 
 early-conflict-detection = []
 hash-registers = ["dep:rustc-hash"]
+profiling = []
 wait-on-retry = []
 
 [dependencies]

@@ -145,8 +145,9 @@ mod tvar;
 mod test;
 
 pub use result::*;
-pub use transaction::Transaction;
-pub use transaction::TransactionControl;
+pub use transaction::{atomically, atomically_with_err, Transaction, TransactionControl};
+#[cfg(feature = "profiling")]
+pub use transaction::{profile_atomically, profile_atomically_with_err, TransactionTallies};
 pub use tvar::TVar;
 
 /// Convert a `TransactionClosureResult<T, E_A>` to `TransactionClosureResult<T, E_B>`.
@@ -241,24 +242,6 @@ pub fn retry<T>() -> StmClosureResult<T> {
     Err(StmError::Retry)
 }
 
-/// Run a function atomically by using Software Transactional Memory.
-/// It calls to `Transaction::with` internally, but is more explicit.
-pub fn atomically<T, F>(f: F) -> T
-where
-    F: Fn(&mut Transaction) -> StmClosureResult<T>,
-{
-    Transaction::with(f)
-}
-
-/// Run a function atomically by using Software Transactional Memory.
-/// It calls to `Transaction::with_err` internally, but is more explicit.
-pub fn atomically_with_err<T, E, F>(f: F) -> Result<T, E>
-where
-    F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
-{
-    Transaction::with_err(f)
-}
-
 #[inline]
 /// Unwrap `Option` or call retry if it is `None`.
 ///
@@ -342,6 +325,7 @@ where
     tx.or(|t| f(t).map(Some), |_| Ok(None))
 }
 
+// #[cfg(not(feature = "profiling"))]
 #[cfg(test)]
 mod test_lib {
     use super::*;
@@ -525,3 +509,205 @@ mod test_lib {
         assert_eq!(x, None);
     }
 }
+
+// #[cfg(feature = "profiling")]
+// #[cfg(test)]
+// mod test_lib {
+//     use super::*;
+
+//     #[test]
+//     fn infinite_retry() {
+//         let mut t = TransactionTallies::default();
+//         let terminated = test::terminates(300, move || {
+//             let _infinite_retry: i32 = atomically(&mut t, |_| retry());
+//         });
+//         assert!(!terminated);
+//     }
+
+//     #[test]
+//     fn stm_nested() {
+//         let var = TVar::new(0);
+
+//         let mut t = TransactionTallies::default();
+//         let x = atomically(&mut t, |tx| {
+//             var.write(tx, 42)?;
+//             var.read(tx)
+//         });
+
+//         assert_eq!(42, x);
+//     }
+
+//     /// Run multiple threads.
+//     ///
+//     /// Thread 1: Read a var, block until it is not 0 and then
+//     /// return that value.
+//     ///
+//     /// Thread 2: Wait a bit. Then write a value.
+//     ///
+//     /// Check if Thread 1 is woken up correctly and then check for
+//     /// correctness.
+//     #[test]
+//     fn threaded() {
+//         use std::thread;
+//         use std::time::Duration;
+
+//         let var = TVar::new(0);
+//         // Clone for other thread.
+//         let varc = var.clone();
+
+//         let x = test::async_test(
+//             800,
+//             move || {
+//                 let mut t = TransactionTallies::default();
+//                 atomically(&mut t, |tx| {
+//                     let x = varc.read(tx)?;
+//                     if x == 0 {
+//                         retry()
+//                     } else {
+//                         Ok(x)
+//                     }
+//                 })
+//             },
+//             || {
+//                 thread::sleep(Duration::from_millis(100));
+
+//                 let mut tt = TransactionTallies::default();
+//                 atomically(&mut tt, |tx| var.write(tx, 42));
+//             },
+//         )
+//         .unwrap();
+
+//         assert_eq!(42, x);
+//     }
+
+//     /// test if a STM calculation is rerun when a Var changes while executing
+//     #[test]
+//     fn read_write_interfere() {
+//         use std::thread;
+//         use std::time::Duration;
+
+//         // create var
+//         let var = TVar::new(0);
+//         let varc = var.clone(); // Clone for other thread.
+
+//         // spawn a thread
+//         let t = thread::spawn(move || {
+//             let mut t = TransactionTallies::default();
+//             atomically(&mut t, |tx| {
+//                 // read the var
+//                 let x = varc.read(tx)?;
+//                 // ensure that x varc changes in between
+//                 thread::sleep(Duration::from_millis(500));
+
+//                 // write back modified data this should only
+//                 // happen when the value has not changed
+//                 varc.write(tx, x + 10)
+//             });
+//         });
+
+//         // ensure that the thread has started and already read the var
+//         thread::sleep(Duration::from_millis(100));
+
+//         // now change it
+//         let mut tt = TransactionTallies::default();
+//         atomically(&mut tt, |tx| var.write(tx, 32));
+
+//         // finish and compare
+//         let _ = t.join();
+//         assert_eq!(42, var.read_atomic());
+//     }
+
+//     #[test]
+//     fn or_simple() {
+//         let var = TVar::new(42);
+
+//         let mut t = TransactionTallies::default();
+//         let x = atomically(&mut t, |tx| tx.or(|_| retry(), |tx| var.read(tx)));
+
+//         assert_eq!(x, 42);
+//     }
+
+//     /// A variable should not be written,
+//     /// when another branch was taken
+//     #[test]
+//     fn or_nocommit() {
+//         let var = TVar::new(42);
+
+//         let mut t = TransactionTallies::default();
+//         let x = atomically(&mut t, |tx| {
+//             tx.or(
+//                 |tx| {
+//                     var.write(tx, 23)?;
+//                     retry()
+//                 },
+//                 |tx| var.read(tx),
+//             )
+//         });
+
+//         assert_eq!(x, 42);
+//     }
+
+//     #[test]
+//     fn or_nested_first() {
+//         let var = TVar::new(42);
+
+//         let mut t = TransactionTallies::default();
+//         let x = atomically(&mut t, |tx| {
+//             tx.or(|tx| tx.or(|_| retry(), |_| retry()), |tx| var.read(tx))
+//         });
+
+//         assert_eq!(x, 42);
+//     }
+
+//     #[test]
+//     fn or_nested_second() {
+//         let var = TVar::new(42);
+
+//         let mut t = TransactionTallies::default();
+//         let x = atomically(&mut t, |tx| {
+//             tx.or(|_| retry(), |t| t.or(|t2| var.read(t2), |_| retry()))
+//         });
+
+//         assert_eq!(x, 42);
+//     }
+
+//     #[test]
+//     fn unwrap_some() {
+//         let x = Some(42);
+//         let mut t = TransactionTallies::default();
+//         let y = atomically(&mut t, |_| unwrap_or_retry(x));
+//         assert_eq!(y, 42);
+//     }
+
+//     #[test]
+//     fn unwrap_none() {
+//         let x: Option<i32> = None;
+//         assert_eq!(unwrap_or_retry(x), retry());
+//     }
+
+//     #[test]
+//     fn guard_true() {
+//         let x = guard(true);
+//         assert_eq!(x, Ok(()));
+//     }
+
+//     #[test]
+//     fn guard_false() {
+//         let x = guard(false);
+//         assert_eq!(x, retry());
+//     }
+
+//     #[test]
+//     fn optionally_succeed() {
+//         let mut t = TransactionTallies::default();
+//         let x = atomically(&mut t, |t| optionally(t, |_| Ok(42)));
+//         assert_eq!(x, Some(42));
+//     }
+
+//     #[test]
+//     fn optionally_fail() {
+//         let mut t = TransactionTallies::default();
+//         let x: Option<i32> = atomically(&mut t, |t| optionally(t, |_| retry()));
+//         assert_eq!(x, None);
+//     }
+// }
