@@ -2,32 +2,28 @@
 pub mod control_block;
 pub mod log_var;
 
-use std::any::Any;
-use std::cell::Cell;
-// #[cfg(feature = "hash-registers")]
-// use std::collections::hash_map::Entry;
-// #[cfg(not(feature = "hash-registers"))]
-// use std::collections::{btree_map::Entry, BTreeMap};
 cfg_if::cfg_if! {
     if #[cfg(feature = "hash-registers")] {
         use std::collections::hash_map::Entry;
+
+        use rustc_hash::FxHashMap;
     } else {
         use std::collections::{btree_map::Entry, BTreeMap};
     }
 }
+
+use std::any::Any;
+use std::cell::Cell;
 use std::mem;
 use std::sync::Arc;
 
-#[cfg(feature = "hash-registers")]
-use rustc_hash::FxHashMap;
-
+use crate::result::{StmClosureResult, StmError};
+use crate::tvar::{TVar, VarControlBlock};
 use crate::{TransactionClosureResult, TransactionError, TransactionResult};
 
 #[cfg(feature = "wait-on-retry")]
-use self::control_block::ControlBlock;
-use self::log_var::LogVar;
-use super::result::{StmClosureResult, StmError};
-use super::tvar::{TVar, VarControlBlock};
+use control_block::ControlBlock;
+use log_var::LogVar;
 
 thread_local!(static TRANSACTION_RUNNING: Cell<bool> = const { Cell::new(false) });
 
@@ -60,6 +56,71 @@ pub enum TransactionControl {
     Abort,
 }
 
+#[cfg(feature = "profiling")]
+#[derive(Debug, Default)]
+pub struct TransactionTallies {
+    pub n_attempts: std::sync::atomic::AtomicUsize,
+    pub n_retry: std::sync::atomic::AtomicUsize,
+    pub n_error: std::sync::atomic::AtomicUsize,
+    pub n_read: std::sync::atomic::AtomicUsize,
+    pub n_redundant_read: std::sync::atomic::AtomicUsize,
+    pub n_read_after_write: std::sync::atomic::AtomicUsize,
+    pub n_write: std::sync::atomic::AtomicUsize,
+}
+
+#[cfg(feature = "profiling")]
+impl std::ops::AddAssign for TransactionTallies {
+    fn add_assign(&mut self, rhs: Self) {
+        self.n_attempts.fetch_add(
+            rhs.n_attempts.load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.n_retry.fetch_add(
+            rhs.n_retry.load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.n_error.fetch_add(
+            rhs.n_error.load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.n_read.fetch_add(
+            rhs.n_read.load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.n_redundant_read.fetch_add(
+            rhs.n_redundant_read
+                .load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.n_read_after_write.fetch_add(
+            rhs.n_read_after_write
+                .load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+        self.n_write.fetch_add(
+            rhs.n_write.load(std::sync::atomic::Ordering::Relaxed),
+            std::sync::atomic::Ordering::Relaxed,
+        );
+    }
+}
+
+#[cfg(feature = "profiling")]
+impl std::iter::Sum for TransactionTallies {
+    fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
+        iter.fold(Self::default(), |mut acc, t| {
+            acc += t;
+            acc
+        })
+    }
+}
+
+// -- Transactions
+
+#[cfg(not(feature = "hash-registers"))]
+pub(crate) type RegisterType = BTreeMap<Arc<VarControlBlock>, LogVar>;
+#[cfg(feature = "hash-registers")]
+pub(crate) type RegisterType = FxHashMap<*const VarControlBlock, LogVar>;
+
 /// Transaction tracks all the read and written variables.
 ///
 /// It is used for checking vars, to ensure atomicity.
@@ -68,26 +129,13 @@ pub struct Transaction {
     /// The `VarControlBlock` is unique because it uses it's address for comparing.
     ///
     /// The logs need to be accessed in a order to prevend dead-locks on locking.
-    #[cfg(not(feature = "hash-registers"))]
-    vars: BTreeMap<Arc<VarControlBlock>, LogVar>,
-    #[cfg(feature = "hash-registers")]
-    vars: FxHashMap<*const VarControlBlock, LogVar>,
+    vars: RegisterType,
+    #[cfg(feature = "profiling")]
+    tallies: TransactionTallies,
 }
 
+/// Public API
 impl Transaction {
-    /// Create a new log.
-    ///
-    /// Normally you don't need to call this directly.
-    /// Use `atomically` instead.
-    fn new() -> Transaction {
-        Transaction {
-            #[cfg(not(feature = "hash-registers"))]
-            vars: BTreeMap::new(),
-            #[cfg(feature = "hash-registers")]
-            vars: FxHashMap::default(),
-        }
-    }
-
     /// Run a function with a transaction.
     ///
     /// It is equivalent to `atomically`.
@@ -257,16 +305,243 @@ impl Transaction {
             transaction.clear();
         }
     }
+}
 
-    #[allow(clippy::needless_pass_by_value)]
-    /// Perform a downcast on a var.
-    fn downcast<T: Any + Clone>(var: Arc<dyn Any>) -> T {
-        match var.downcast_ref::<T>() {
-            Some(s) => s.clone(),
-            None => unreachable!("TVar has wrong type"),
+#[cfg(feature = "profiling")]
+/// Public profiling API
+impl Transaction {
+    /// Run a function with a transaction.
+    ///
+    /// It is equivalent to `atomically`.
+    pub fn profile_with<T, F>(f: F) -> (T, TransactionTallies)
+    where
+        F: Fn(&mut Transaction) -> StmClosureResult<T>,
+    {
+        match Transaction::profile_with_control(|_| TransactionControl::Retry, f) {
+            (Some(t), tallies) => (t, tallies),
+            (None, _) => unreachable!(),
         }
     }
 
+    /// Run a function with a transaction.
+    ///
+    /// `with_control` takes another control function, that
+    /// can steer the control flow and possible terminate early.
+    ///
+    /// `control` can react to counters, timeouts or external inputs.
+    ///
+    /// It allows the user to fall back to another strategy, like a global lock
+    /// in the case of too much contention.
+    ///
+    /// Please not, that the transaction may still infinitely wait for changes when `retry` is
+    /// called and `control` does not abort.
+    /// If you need a timeout, another thread should signal this through a [`TVar`].
+    pub fn profile_with_control<T, F, C>(mut control: C, f: F) -> (Option<T>, TransactionTallies)
+    where
+        F: Fn(&mut Transaction) -> StmClosureResult<T>,
+        C: FnMut(StmError) -> TransactionControl,
+    {
+        let _guard = TransactionGuard::new();
+
+        // create a log guard for initializing and cleaning up
+        // the log
+        let mut transaction = Transaction::new();
+
+        // loop until success
+        loop {
+            transaction
+                .tallies
+                .n_attempts
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // run the computation
+            match f(&mut transaction) {
+                // on success exit loop
+                Ok(t) => {
+                    if transaction.commit() {
+                        return (Some(t), transaction.tallies);
+                    }
+                }
+
+                Err(e) => {
+                    // Check if the user wants to abort the transaction.
+                    match e {
+                        StmError::Failure => {
+                            transaction
+                                .tallies
+                                .n_error
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                        StmError::Retry => {
+                            transaction
+                                .tallies
+                                .n_retry
+                                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+
+                    if let TransactionControl::Abort = control(e) {
+                        return (None, transaction.tallies);
+                    }
+
+                    // on retry wait for changes
+                    #[cfg(feature = "wait-on-retry")]
+                    if let StmError::Retry = e {
+                        transaction.wait_for_change();
+                    }
+                }
+            }
+
+            // clear log before retrying computation
+            transaction.clear();
+        }
+    }
+
+    /// Run a function with a transaction.
+    ///
+    /// The transaction will be retried until:
+    /// - it is validated, or
+    /// - it is explicitly aborted from the function, using the `TODO` function.
+    pub fn profile_with_err<T, F, E>(f: F) -> (Result<T, E>, TransactionTallies)
+    where
+        F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
+    {
+        let _guard = TransactionGuard::new();
+
+        // create a log guard for initializing and cleaning up
+        // the log
+        let mut transaction = Transaction::new();
+
+        // loop until success
+        loop {
+            transaction
+                .tallies
+                .n_attempts
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // run the computation
+            match f(&mut transaction) {
+                // on success exit loop
+                Ok(t) => {
+                    if transaction.commit() {
+                        return (Ok(t), transaction.tallies);
+                    }
+                }
+                // on error,
+                Err(e) => match e {
+                    // abort and return the error
+                    TransactionError::Abort(err) => return (Err(err), transaction.tallies),
+                    // retry
+                    TransactionError::Stm(err) => {
+                        match err {
+                            StmError::Failure => {
+                                transaction
+                                    .tallies
+                                    .n_error
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                            StmError::Retry => {
+                                transaction
+                                    .tallies
+                                    .n_retry
+                                    .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                            }
+                        }
+                        #[cfg(feature = "wait-on-retry")]
+                        transaction.wait_for_change();
+                    }
+                },
+            }
+
+            // clear log before retrying computation
+            transaction.clear();
+        }
+    }
+
+    /// Run a function with a transaction.
+    ///
+    /// `with_control` takes another control function, that
+    /// can steer the control flow and possible terminate early.
+    ///
+    /// `control` can react to counters, timeouts or external inputs.
+    ///
+    /// It allows the user to fall back to another strategy, like a global lock
+    /// in the case of too much contention.
+    ///
+    /// Please not, that the transaction may still infinitely wait for changes when `retry` is
+    /// called and `control` does not abort.
+    /// If you need a timeout, another thread should signal this through a [`TVar`].
+    pub fn profile_with_control_and_err<T, F, C, E>(
+        mut control: C,
+        f: F,
+    ) -> (TransactionResult<T, E>, TransactionTallies)
+    where
+        F: Fn(&mut Transaction) -> TransactionClosureResult<T, E>,
+        C: FnMut(StmError) -> TransactionControl,
+    {
+        let _guard = TransactionGuard::new();
+
+        // create a log guard for initializing and cleaning up
+        // the log
+        let mut transaction = Transaction::new();
+
+        // loop until success
+        loop {
+            transaction
+                .tallies
+                .n_attempts
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            // run the computation
+            match f(&mut transaction) {
+                // on success exit loop
+                Ok(t) => {
+                    if transaction.commit() {
+                        return (TransactionResult::Validated(t), transaction.tallies);
+                    }
+                }
+
+                Err(e) => {
+                    match e {
+                        TransactionError::Abort(err) => {
+                            return (TransactionResult::Cancelled(err), transaction.tallies);
+                        }
+                        TransactionError::Stm(err) => {
+                            match err {
+                                StmError::Failure => {
+                                    transaction
+                                        .tallies
+                                        .n_error
+                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                }
+                                StmError::Retry => {
+                                    transaction
+                                        .tallies
+                                        .n_retry
+                                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                                }
+                            }
+
+                            // Check if the user wants to abort the transaction.
+                            if let TransactionControl::Abort = control(err) {
+                                return (TransactionResult::Abandoned, transaction.tallies);
+                            }
+
+                            // on retry wait for changes
+                            #[cfg(feature = "wait-on-retry")]
+                            if let StmError::Retry = err {
+                                transaction.wait_for_change();
+                            }
+                        }
+                    }
+                }
+            }
+
+            // clear log before retrying computation
+            transaction.clear();
+        }
+    }
+}
+
+/// In-closure routines
+impl Transaction {
     /// Read a variable and return the value.
     ///
     /// The returned value is not always consistent with the current value of the var,
@@ -276,6 +551,10 @@ impl Transaction {
     /// without running into infinite loops.
     /// Just the commit of wrong values is prevented by STM.
     pub fn read<T: Send + Sync + Any + Clone>(&mut self, var: &TVar<T>) -> StmClosureResult<T> {
+        #[cfg(feature = "profiling")]
+        self.tallies
+            .n_read
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let ctrl = var.control_block().clone();
         // Check if the same var was written before.
         #[cfg(not(feature = "hash-registers"))]
@@ -289,15 +568,41 @@ impl Transaction {
                 let log = entry.get_mut();
                 // if we previously read the var, check for value change
                 if let LogVar::Read(v) = log {
+                    #[cfg(feature = "profiling")]
+                    self.tallies
+                        .n_redundant_read
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                     let crt_v = var.read_ref_atomic();
                     if !Arc::ptr_eq(v, &crt_v) {
                         return Err(StmError::Failure);
                     }
                 }
+                #[cfg(feature = "profiling")]
+                if let LogVar::Write(_) = log {
+                    self.tallies
+                        .n_read_after_write
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
                 log.read()
             }
             #[cfg(not(feature = "early-conflict-detection"))]
-            Entry::Occupied(mut entry) => entry.get_mut().read(),
+            Entry::Occupied(mut entry) => {
+                #[cfg(feature = "profiling")]
+                {
+                    let log = entry.get();
+                    if let LogVar::Read(_) = log {
+                        self.tallies
+                            .n_redundant_read
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    } else if let LogVar::Write(_) = log {
+                        self.tallies
+                            .n_read_after_write
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+
+                entry.get_mut().read()
+            }
 
             // Else load the variable statically.
             Entry::Vacant(entry) => {
@@ -322,6 +627,10 @@ impl Transaction {
         var: &TVar<T>,
         value: T,
     ) -> StmClosureResult<()> {
+        #[cfg(feature = "profiling")]
+        self.tallies
+            .n_write
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         // box the value
         let boxed = Arc::new(value);
 
@@ -355,9 +664,10 @@ impl Transaction {
         F2: Fn(&mut Transaction) -> StmClosureResult<T>,
     {
         // Create a backup of the log.
-        let mut copy = Transaction {
-            vars: self.vars.clone(),
-        };
+        let mut copy = self.vars.clone();
+        // let mut copy = Transaction {
+        //     vars: self.vars.clone(),
+        // };
 
         // Run the first computation.
         let f = first(self);
@@ -366,7 +676,7 @@ impl Transaction {
             // Run other on manual retry call.
             Err(StmError::Retry) => {
                 // swap, so that self is the current run
-                mem::swap(self, &mut copy);
+                mem::swap(&mut self.vars, &mut copy);
 
                 // Run other action.
                 let s = second(self);
@@ -385,11 +695,37 @@ impl Transaction {
             x => x,
         }
     }
+}
+
+/// Internal routines
+impl Transaction {
+    // TODO: replace with a default implementation.
+    /// Create a new log.
+    ///
+    /// Normally you don't need to call this directly.
+    /// Use `atomically` instead.
+    ///
+    fn new() -> Transaction {
+        Transaction {
+            vars: RegisterType::default(),
+            #[cfg(feature = "profiling")]
+            tallies: TransactionTallies::default(),
+        }
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    /// Perform a downcast on a var.
+    fn downcast<T: Any + Clone>(var: Arc<dyn Any>) -> T {
+        match var.downcast_ref::<T>() {
+            Some(s) => s.clone(),
+            None => unreachable!("TVar has wrong type"),
+        }
+    }
 
     /// Combine two logs into a single log, to allow waiting for all reads.
-    fn combine(&mut self, other: Transaction) {
+    fn combine(&mut self, vars: RegisterType) {
         // combine reads
-        for (var, value) in other.vars {
+        for (var, value) in vars {
             // only insert new values
             if let Some(value) = value.obsolete() {
                 self.vars.entry(var).or_insert(value);
