@@ -42,6 +42,21 @@
 //! By default, only the `wait-on-retry` feature is enabled, to keep the behavior identical to the
 //! original library.
 //!
+//! ## Profiling
+//!
+//! The `profiling` feature can be enabled to add event counters to transaction. Their values can
+//! be retrieved by passing a reference to `TransactionTallies` to the new entry functions:
+//! `profile_atomically`, ...
+//!
+//! <div class="warning">
+//!
+//! Do not use the `profiling` feature if you are benchmarking execution times. While regular entry
+//! functions (`atomically`, `atomically_with_err`) are still available, they internally implement
+//! counters without giving public access to their value. This is done to avoid breaking the API
+//! when the feature is enabled.
+//!
+//! </div>
+//!
 //! # Usage
 //!
 //! You should only use the functions that are transaction-safe.
