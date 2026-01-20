@@ -30,3 +30,8 @@ name = "tvar-struct"
 path = "benches/tvars.rs"
 harness = false
 
+[[bench]]
+name = "transaction-struct"
+path = "benches/transactions.rs"
+harness = false
+

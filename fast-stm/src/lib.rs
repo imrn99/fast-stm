@@ -363,7 +363,7 @@ pub fn init_transaction() -> Transaction {
 }
 
 #[cfg(feature = "bench")]
-pub fn commit_transaction(mut t: Transaction) -> bool {
+pub fn commit_transaction(t: &mut Transaction) -> bool {
     t.commit()
 }
 
