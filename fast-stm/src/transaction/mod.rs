@@ -705,7 +705,7 @@ impl Transaction {
     /// Normally you don't need to call this directly.
     /// Use `atomically` instead.
     ///
-    fn new() -> Transaction {
+    pub(crate) fn new() -> Transaction {
         Transaction {
             vars: RegisterType::default(),
             #[cfg(feature = "profiling")]
@@ -787,7 +787,7 @@ impl Transaction {
     /// Write the log back to the variables.
     ///
     /// Return true for success and false, if a read var has changed
-    fn commit(&mut self) -> bool {
+    pub(crate) fn commit(&mut self) -> bool {
         // Use two phase locking for safely writing data back to the vars.
 
         // First phase: acquire locks.
