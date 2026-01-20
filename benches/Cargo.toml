@@ -25,3 +25,8 @@ name = "write-time"
 path = "benches/write.rs"
 harness = false
 
+[[bench]]
+name = "tvar-struct"
+path = "benches/tvars.rs"
+harness = false
+
