@@ -206,6 +206,12 @@ where
     /// but more efficient.
     ///
     /// `read_atomic` returns a clone of the value.
+    ///
+    /// <div class="warning">
+    ///
+    /// This method should not be used inside transactions.
+    ///
+    /// </div>
     pub fn read_atomic(&self) -> T {
         let val = self.read_ref_atomic();
 
@@ -213,6 +219,31 @@ where
             .downcast_ref::<T>()
             .expect("wrong type in Var<T>")
             .clone()
+    }
+
+    #[allow(clippy::missing_panics_doc)]
+    /// `write_atomic` writes a value atomically, without starting a transaction.
+    ///
+    /// It is semantically equivalent to
+    ///
+    /// ```
+    /// # use fast_stm::*;
+    ///
+    /// let var = TVar::new(0);
+    /// atomically(|trans| var.write(trans, 1));
+    /// ```
+    ///
+    /// but more efficient.
+    ///
+    /// <div class="warning">
+    ///
+    /// This method should not be used inside transactions.
+    ///
+    /// </div>
+    pub fn write_atomic(&self, value: T) {
+        let mut val = self.control_block.value.write();
+        let boxed = Arc::new(value);
+        *val = boxed;
     }
 
     /// Read a value atomically but return a reference.
