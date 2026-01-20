@@ -14,7 +14,7 @@ pub fn tvar_wrapping(c: &mut Criterion) {
     let tstruct = TVar::new(Vertex(0.0, 1.0, 0.0));
     let theap = TVar::new(String::from("STM!"));
 
-    let mut g1 = c.benchmark_group("read-times");
+    let mut g1 = c.benchmark_group("tvar-read-times");
     g1.bench_function("TVar::<bool>::read", |b| {
         let mut tx = init_transaction();
         b.iter(|| black_box(tx.read(&tbool)))
@@ -33,7 +33,7 @@ pub fn tvar_wrapping(c: &mut Criterion) {
     });
     g1.finish();
 
-    let mut g2 = c.benchmark_group("write-times");
+    let mut g2 = c.benchmark_group("tvar-write-times");
     g2.bench_function("TVar::<bool>::write", |b| {
         let tbool = TVar::new(false);
         let mut tx = init_transaction();
@@ -56,7 +56,7 @@ pub fn tvar_wrapping(c: &mut Criterion) {
     });
     g2.finish();
 
-    let mut g3 = c.benchmark_group("init-times");
+    let mut g3 = c.benchmark_group("tvar-init-times");
     g3.bench_function("TVar::<bool>::new", |b| {
         b.iter(|| black_box(TVar::new(false)))
     });
