@@ -357,6 +357,16 @@ where
     tx.or(|t| f(t).map(Some), |_| Ok(None))
 }
 
+#[cfg(feature = "bench")]
+pub fn init_transaction() -> Transaction {
+    Transaction::new()
+}
+
+#[cfg(feature = "bench")]
+pub fn commit_transaction(t: &mut Transaction) -> bool {
+    t.commit()
+}
+
 #[cfg(test)]
 mod test_lib {
     use super::*;

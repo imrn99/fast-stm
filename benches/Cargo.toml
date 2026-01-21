@@ -12,22 +12,26 @@ description.workspace = true
 authors = ["Isaie Muron <github@imrn.fr>"]
 
 [dev-dependencies]
-fast-stm.workspace = true
-atomic.workspace = true
-bytemuck.workspace = true
+fast-stm = { workspace = true, features = ["bench"] }
 criterion.workspace = true
 
 [[bench]]
-name = "init-time"
-path = "benches/init.rs"
+name = "read-time"
+path = "benches/read.rs"
 harness = false
 
 [[bench]]
-name = "load-time"
-path = "benches/load.rs"
+name = "write-time"
+path = "benches/write.rs"
 harness = false
 
 [[bench]]
-name = "store-time"
-path = "benches/store.rs"
+name = "tvar-struct"
+path = "benches/tvars.rs"
 harness = false
+
+[[bench]]
+name = "transaction-struct"
+path = "benches/transactions.rs"
+harness = false
+
