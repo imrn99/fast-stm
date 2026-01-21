@@ -43,11 +43,10 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         let tvar = TVar::new(old_value);
         b.iter(|| atomically(|t| tvar.write(t, new_value)))
     });
-    // TODO: uncomment when #25 is merged
-    // g1.bench_function("TVar::<u32>::write_atomic", |b| {
-    //     let tvar = TVar::new(old_value);
-    //     b.iter(|| black_box(tvar.write_atomic(new_value)))
-    // });
+    g1.bench_function("TVar::<u32>::write_atomic", |b| {
+        let tvar = TVar::new(old_value);
+        b.iter(|| black_box(tvar.write_atomic(new_value)))
+    });
     g1.bench_function("AtomicU32::store", |b| {
         let atom = AtomicU32::new(old_value);
         b.iter(|| black_box(atom.store(new_value, Ordering::Relaxed)))
