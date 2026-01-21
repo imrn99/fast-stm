@@ -1,5 +1,20 @@
 # CHANGELOG
 
+## 0.6.2
+
+### New
+
+* add a `write_atomic` method to `TVar` to write values without using a transaction
+* implement event counters in transaction behind new `profiling` feature
+* implement manual transaction initialization and commit behind new `bench` feature
+
+### Changed
+
+* rework benchmarks 
+* (repo) update nix flake
+
+---
+
 ## 0.6.1
 
 ### New
