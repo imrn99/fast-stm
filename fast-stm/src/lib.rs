@@ -359,7 +359,7 @@ where
 
 #[cfg(feature = "bench")]
 pub fn init_transaction() -> Transaction {
-    Transaction::new()
+    Transaction::default()
 }
 
 #[cfg(feature = "bench")]

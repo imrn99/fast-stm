@@ -134,6 +134,16 @@ pub struct Transaction {
     tallies: TransactionTallies,
 }
 
+impl Default for Transaction {
+    fn default() -> Self {
+        Self {
+            vars: RegisterType::default(),
+            #[cfg(feature = "profiling")]
+            tallies: TransactionTallies::default(),
+        }
+    }
+}
+
 /// Public API
 impl Transaction {
     /// Run a function with a transaction.
@@ -171,7 +181,7 @@ impl Transaction {
 
         // create a log guard for initializing and cleaning up
         // the log
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // loop until success
         loop {
@@ -216,7 +226,7 @@ impl Transaction {
 
         // create a log guard for initializing and cleaning up
         // the log
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // loop until success
         loop {
@@ -267,7 +277,7 @@ impl Transaction {
 
         // create a log guard for initializing and cleaning up
         // the log
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // loop until success
         loop {
@@ -345,7 +355,7 @@ impl Transaction {
 
         // create a log guard for initializing and cleaning up
         // the log
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // loop until success
         loop {
@@ -409,7 +419,7 @@ impl Transaction {
 
         // create a log guard for initializing and cleaning up
         // the log
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // loop until success
         loop {
@@ -481,7 +491,7 @@ impl Transaction {
 
         // create a log guard for initializing and cleaning up
         // the log
-        let mut transaction = Transaction::new();
+        let mut transaction = Transaction::default();
 
         // loop until success
         loop {
@@ -866,20 +876,6 @@ impl Transaction {
 
 /// Internal routines
 impl Transaction {
-    // TODO: replace with a default implementation.
-    /// Create a new log.
-    ///
-    /// Normally you don't need to call this directly.
-    /// Use `atomically` instead.
-    ///
-    pub(crate) fn new() -> Transaction {
-        Transaction {
-            vars: RegisterType::default(),
-            #[cfg(feature = "profiling")]
-            tallies: TransactionTallies::default(),
-        }
-    }
-
     #[allow(clippy::needless_pass_by_value)]
     /// Perform a downcast on a var.
     fn downcast<T: Any + Clone>(var: Arc<dyn Any>) -> T {
@@ -1052,7 +1048,7 @@ mod test {
     use super::*;
     #[test]
     fn read() {
-        let mut log = Transaction::new();
+        let mut log = Transaction::default();
         let var = TVar::new(vec![1, 2, 3, 4]);
 
         // The variable can be read.
@@ -1061,7 +1057,7 @@ mod test {
 
     #[test]
     fn write_read() {
-        let mut log = Transaction::new();
+        let mut log = Transaction::default();
         let var = TVar::new(vec![1, 2]);
 
         log.write(&var, vec![1, 2, 3, 4]).unwrap();
