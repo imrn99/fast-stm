@@ -1,5 +1,19 @@
 # CHANGELOG
 
+## 0.6.3
+
+### Changed
+
+* change `TVar::modify`/`TVar::replace` internals to avoid double access
+  by @imrn99 in https://github.com/imrn99/fast-stm/pull/27
+* (internals) replace `Transaction::new` with a `Default` trait impl
+
+### Fixed
+
+* re-export `TransactionTallies` if `profiling` feature is enabled
+
+---
+
 ## 0.6.2
 
 ### New
