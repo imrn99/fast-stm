@@ -652,6 +652,173 @@ impl Transaction {
         Ok(())
     }
 
+    /// Modify a variable.
+    ///
+    /// The write is not immediately visible to other threads,
+    /// but atomically commited at the end of the computation.
+    ///
+    /// Prefer this method over calling `read` then `write` for performance.
+    pub fn modify<T: Any + Send + Sync + Clone, F>(
+        &mut self,
+        var: &TVar<T>,
+        f: F,
+    ) -> StmClosureResult<()>
+    where
+        F: FnOnce(T) -> T,
+    {
+        #[cfg(feature = "profiling")]
+        self.tallies
+            .n_write
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        // new control block
+        let ctrl = var.control_block().clone();
+        // update or create new entry
+        #[cfg(not(feature = "hash-registers"))]
+        let key = ctrl;
+        #[cfg(feature = "hash-registers")]
+        let key = Arc::as_ptr(&ctrl);
+        match self.vars.entry(key) {
+            // If the variable has been accessed before, then load that value.
+            #[cfg(feature = "early-conflict-detection")]
+            Entry::Occupied(mut entry) => {
+                let log = entry.get_mut();
+                // if we previously read the var, check for value change
+                if let LogVar::Read(v) = log {
+                    #[cfg(feature = "profiling")]
+                    self.tallies
+                        .n_redundant_read
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let crt_v = var.read_ref_atomic();
+                    if !Arc::ptr_eq(v, &crt_v) {
+                        return Err(StmError::Failure);
+                    }
+                }
+                #[cfg(feature = "profiling")]
+                if let LogVar::Write(_) = log {
+                    self.tallies
+                        .n_read_after_write
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                let value = Transaction::downcast(log.read());
+                let boxed = Arc::new(f(value));
+                entry.get_mut().write(boxed);
+            }
+            #[cfg(not(feature = "early-conflict-detection"))]
+            Entry::Occupied(mut entry) => {
+                #[cfg(feature = "profiling")]
+                {
+                    let log = entry.get();
+                    if let LogVar::Read(_) = log {
+                        self.tallies
+                            .n_redundant_read
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    } else if let LogVar::Write(_) = log {
+                        self.tallies
+                            .n_read_after_write
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+
+                let value = Transaction::downcast(entry.get_mut().read());
+                let boxed = Arc::new(f(value));
+                entry.get_mut().write(boxed);
+            }
+            Entry::Vacant(entry) => {
+                // Read the value from the var.
+                let value = Transaction::downcast(var.read_ref_atomic());
+                let boxed = Arc::new(f(value));
+                entry.insert(LogVar::Write(boxed));
+            }
+        }
+
+        // For now always succeeds, but that may change later.
+        Ok(())
+    }
+
+    /// Replace a variable.
+    ///
+    /// The write is not immediately visible to other threads,
+    /// but atomically commited at the end of the computation.
+    ///
+    /// Prefer this method over calling `read` then `write` for performance.
+    pub fn replace<T: Any + Send + Sync + Clone>(
+        &mut self,
+        var: &TVar<T>,
+        value: T,
+    ) -> StmClosureResult<T> {
+        #[cfg(feature = "profiling")]
+        self.tallies
+            .n_write
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        // box the value
+        let boxed = Arc::new(value);
+
+        // new control block
+        let ctrl = var.control_block().clone();
+        // update or create new entry
+        #[cfg(not(feature = "hash-registers"))]
+        let key = ctrl;
+        #[cfg(feature = "hash-registers")]
+        let key = Arc::as_ptr(&ctrl);
+        let value = match self.vars.entry(key) {
+            // If the variable has been accessed before, then load that value.
+            #[cfg(feature = "early-conflict-detection")]
+            Entry::Occupied(mut entry) => {
+                let log = entry.get_mut();
+                // if we previously read the var, check for value change
+                if let LogVar::Read(v) = log {
+                    #[cfg(feature = "profiling")]
+                    self.tallies
+                        .n_redundant_read
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    let crt_v = var.read_ref_atomic();
+                    if !Arc::ptr_eq(v, &crt_v) {
+                        return Err(StmError::Failure);
+                    }
+                }
+                #[cfg(feature = "profiling")]
+                if let LogVar::Write(_) = log {
+                    self.tallies
+                        .n_read_after_write
+                        .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                }
+                let value = log.read();
+                entry.get_mut().write(boxed);
+                value
+            }
+            #[cfg(not(feature = "early-conflict-detection"))]
+            Entry::Occupied(mut entry) => {
+                #[cfg(feature = "profiling")]
+                {
+                    let log = entry.get();
+                    if let LogVar::Read(_) = log {
+                        self.tallies
+                            .n_redundant_read
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    } else if let LogVar::Write(_) = log {
+                        self.tallies
+                            .n_read_after_write
+                            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                    }
+                }
+
+                let value = entry.get_mut().read();
+                entry.get_mut().write(boxed);
+                value
+            }
+            Entry::Vacant(entry) => {
+                // Read the value from the var.
+                let value = var.read_ref_atomic();
+                entry.insert(LogVar::Write(boxed));
+                value
+            }
+        };
+
+        // For now always succeeds, but that may change later.
+        Ok(Transaction::downcast(value))
+    }
+
     /// Combine two calculations. When one blocks with `retry`,
     /// run the other, but don't commit the changes in the first.
     ///

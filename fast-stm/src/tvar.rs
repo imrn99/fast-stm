@@ -273,6 +273,8 @@ where
 
     /// Modify the content of a `TVar` with the function f.
     ///
+    /// Prefer this method over calling `read` then `write` for performance.
+    ///
     /// ```
     /// # use fast_stm::*;
     ///
@@ -288,12 +290,12 @@ where
     where
         F: FnOnce(T) -> T,
     {
-        let old = self.read(transaction)?;
-        self.write(transaction, f(old))
+        transaction.modify(self, f)
     }
 
-    /// Replaces the value of a `TVar` with a new one, returning
-    /// the old one.
+    /// Replaces the value of a `TVar` with a new one, returning the old one.
+    ///
+    /// Prefer this method over calling `read` then `write` for performance.
     ///
     /// ```
     /// # use fast_stm::*;
@@ -307,9 +309,7 @@ where
     /// assert_eq!(var.read_atomic(), 42);
     /// ```
     pub fn replace(&self, transaction: &mut Transaction, value: T) -> StmClosureResult<T> {
-        let old = self.read(transaction)?;
-        self.write(transaction, value)?;
-        Ok(old)
+        transaction.replace(self, value)
     }
 
     /// Check if two `TVar`s refer to the same position.
