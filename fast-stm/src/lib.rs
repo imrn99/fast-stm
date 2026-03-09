@@ -164,6 +164,9 @@ pub use transaction::Transaction;
 pub use transaction::TransactionControl;
 pub use tvar::TVar;
 
+#[cfg(feature = "profiling")]
+pub use transaction::TransactionTallies;
+
 /// Convert a `TransactionClosureResult<T, E_A>` to `TransactionClosureResult<T, E_B>`.
 ///
 /// This macro is used to cleanly write transactions where multiple kind of errors are
