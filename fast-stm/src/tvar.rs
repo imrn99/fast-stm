@@ -308,8 +308,8 @@ where
     /// assert_eq!(x, 0);
     /// assert_eq!(var.read_atomic(), 42);
     /// ```
-    pub fn replace(&self, transaction: &mut Transaction, value: T) -> StmClosureResult<T> {
-        transaction.replace(self, value)
+    pub fn exchange(&self, transaction: &mut Transaction, value: T) -> StmClosureResult<T> {
+        transaction.exchange(self, value)
     }
 
     /// Check if two `TVar`s refer to the same position.
