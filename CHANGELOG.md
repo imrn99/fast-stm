@@ -1,5 +1,23 @@
 # CHANGELOG
 
+Breaking changes are **highlighted using bold**.
+
+## 0.7.0
+
+### New
+
+* (bench) add `RwLock` to read/write time micro-benchmarks
+  by @imrn99 in https://github.com/imrn99/fast-stm/pull/30
+* (ci) check dock generation on PR, publish it on merge
+  by @imrn99 in https://github.com/imrn99/fast-stm/pull/31
+
+### Changed
+
+* **rename `TVar::replace` to `TVar::exchange`**
+  by @imrn99 in https://github.com/imrn99/fast-stm/pull/29
+
+---
+
 ## 0.6.3
 
 ### Changed
