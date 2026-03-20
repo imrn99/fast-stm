@@ -1,5 +1,6 @@
 use std::hint::black_box;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::RwLock;
 
 use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
@@ -31,6 +32,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     // G1
     let tvar = TVar::new(42_u32);
     let atom = AtomicU32::new(42);
+    let lock = RwLock::new(42_u32);
 
     let mut g1 = c.benchmark_group("read-times");
 
@@ -46,6 +48,12 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     });
     g1.bench_function("AtomicU32::load", |b| {
         b.iter(|| black_box(atom.load(Ordering::Relaxed)))
+    });
+    g1.bench_function("RwLock::read", |b| {
+        b.iter(|| {
+            let res = lock.read().unwrap();
+            black_box(*res)
+        })
     });
     g1.finish();
 

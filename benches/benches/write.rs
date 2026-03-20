@@ -1,5 +1,6 @@
 use std::hint::black_box;
 use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::RwLock;
 
 use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
@@ -50,6 +51,13 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     g1.bench_function("AtomicU32::store", |b| {
         let atom = AtomicU32::new(old_value);
         b.iter(|| black_box(atom.store(new_value, Ordering::Relaxed)))
+    });
+    g1.bench_function("RwLock::write", |b| {
+        let lock = RwLock::new(old_value);
+        b.iter(|| {
+            let mut res = lock.write().unwrap();
+            *res = new_value;
+        })
     });
 
     g1.finish();
