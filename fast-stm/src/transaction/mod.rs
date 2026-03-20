@@ -746,13 +746,13 @@ impl Transaction {
         Ok(())
     }
 
-    /// Replace a variable.
+    /// Replace a variable, returning the old value.
     ///
     /// The write is not immediately visible to other threads,
     /// but atomically commited at the end of the computation.
     ///
     /// Prefer this method over calling `read` then `write` for performance.
-    pub fn replace<T: Any + Send + Sync + Clone>(
+    pub fn exchange<T: Any + Send + Sync + Clone>(
         &mut self,
         var: &TVar<T>,
         value: T,
