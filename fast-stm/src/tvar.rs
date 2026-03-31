@@ -302,7 +302,7 @@ where
     ///
     /// let var = TVar::new(0);
     /// let x = atomically(|trans|
-    ///     var.replace(trans, 42)
+    ///     var.exchange(trans, 42)
     /// );
     ///
     /// assert_eq!(x, 0);
