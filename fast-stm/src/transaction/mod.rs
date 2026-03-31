@@ -736,9 +736,9 @@ impl Transaction {
             }
             Entry::Vacant(entry) => {
                 // Read the value from the var.
-                let value = Transaction::downcast(var.read_ref_atomic());
-                let boxed = Arc::new(f(value));
-                entry.insert(LogVar::Write(boxed));
+                let value = var.read_ref_atomic();
+                let boxed = Arc::new(f(Transaction::downcast(value.clone())));
+                entry.insert(LogVar::ReadWrite(value, boxed));
             }
         }
 
@@ -820,7 +820,7 @@ impl Transaction {
             Entry::Vacant(entry) => {
                 // Read the value from the var.
                 let value = var.read_ref_atomic();
-                entry.insert(LogVar::Write(boxed));
+                entry.insert(LogVar::ReadWrite(value.clone(), boxed));
                 value
             }
         };
