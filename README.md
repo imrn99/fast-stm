@@ -78,6 +78,12 @@ println!("var = {}", x);
 
 # STM safety
 
+> [!WARNING]
+> This implementation does not guarantee opacity. Live transactions can observe
+> inconsistent intermediate states. This has to be accounted for when writing
+> transactional code segments. For more details on opacity, see
+> [On the Correctness of Transactional Memory](https://infoscience.epfl.ch/server/api/core/bitstreams/9f16872d-7c62-4a6f-bdb9-21df82549c71/content).
+
 Software transactional memory is completely safe in the terms,
 that Rust considers safe. Still there are multiple rules that
 you should obey when dealing with software transactional memory:
