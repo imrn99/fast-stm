@@ -2,6 +2,20 @@
 
 Breaking changes are **highlighted using bold**.
 
+## 0.7.1
+
+### Fixed
+
+* `TVar::replace` and `TVar::modify` insert a read-write log in transaction registers
+  by @imrn99 in https://github.com/imrn99/fast-stm/pull/34
+
+### Misc
+
+* doc: mention (lack of) opacity
+  by @imrn99 in https://github.com/imrn99/fast-stm/pull/35
+
+---
+
 ## 0.7.0
 
 ### New
