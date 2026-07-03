@@ -2,11 +2,11 @@ use std::hint::black_box;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::RwLock;
 
+use benches::stm::{atomically, init_transaction, TVar};
 use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
-use fast_stm::{atomically, init_transaction, TVar};
 
 /// Write routines benchmarks
 ///
