@@ -21,7 +21,7 @@ jobs:
       - name: Check Format
         run: cargo fmt -- --check
   clippy:
-    name: ${{ matrix.backend }} clippy lints (${{ matrix.feats }})
+    name: Check `${{ matrix.backend }}` clippy lints (${{ matrix.feats }})
     strategy:
       matrix:
         backend: [ fast-stm, sserp-stm ]
@@ -36,7 +36,7 @@ jobs:
       - name: Run Clippy
         run: cargo clippy -p ${{ matrix.backend }} --all-targets ${{ matrix.feats }}
   tests:
-    name: ${{ matrix.backend }} tests (${{ matrix.feats }})
+    name: Run `${{ matrix.backend }}` tests (${{ matrix.feats }})
     strategy:
       matrix:
         backend: [ fast-stm, sserp-stm ]
