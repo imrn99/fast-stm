@@ -11,7 +11,7 @@ env:
 
 jobs:
   format:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -21,7 +21,11 @@ jobs:
       - name: Check Format
         run: cargo fmt -- --check
   clippy:
-    runs-on: ubuntu-22.04
+    name: Crate clippy lints (${{ matrix.feats }})
+    strategy:
+      matrix:
+        feats: [ --all-features, --no-default-features ]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -29,19 +33,13 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run Clippy
-        run: cargo clippy --all-targets --all-features
-  clippy-no-feat:
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          submodules: recursive
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-      - name: Run Clippy
-        run: cargo clippy --all-targets --no-default-features
+        run: cargo clippy -p fast-stm --all-targets ${{ matrix.feats }}
   tests:
-    runs-on: ubuntu-22.04
+    name: Crate tests (${{ matrix.feats }})
+    strategy:
+      matrix:
+        feats: [ --all-features, --no-default-features ]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
         with:
@@ -49,4 +47,4 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: Run Tests
-        run: cargo test --all-targets --all-features
+        run: cargo test -p fast-stm --all-targets ${{ matrix.feats }}
