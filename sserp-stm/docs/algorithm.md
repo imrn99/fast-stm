@@ -2,12 +2,10 @@
 
 This crate implements Algorithm 1 from:
 
-Pierre Sutra, Patrick Marlier, Valerio Schiavoni, and Francois Trahay,
-"Boosting transactional memory with stricter serializability", COORDINATION 2018.
-
-Local source used during implementation:
-
-`/home/muroni/Zotero/storage/3YBBVWGM/Sutra et al. - 2018 - Boosting Transactional Memory with Stricter Serializability.pdf`
+Pierre Sutra, Patrick Marlier, Valerio Schiavoni, and François Trahay. 2018.
+Boosting Transactional Memory with Stricter Serializability.
+In Coordination Models and Languages: 20th IFIP WG 6.1 International Conference, COORDINATION 2018, Held as Part of the 13th International Federated Conference on Distributed Computing Techniques, DisCoTec 2018, Madrid, Spain, June 18-21, 2018.
+Proceedings. Springer-Verlag, Berlin, Heidelberg, 231–251. https://doi.org/10.1007/978-3-319-92408-3_11
 
 ## Variant
 
