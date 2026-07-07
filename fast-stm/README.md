@@ -49,12 +49,15 @@ This crate exposes features that can tweak implementation behavior:
   a transaction, check whether it changed before the commit routine.
 - `hash-registers` - use `HashMap`-based internal read and write registers
   backed by `rustc-hash` instead of `BTreeMap` registers.
+
+Only `wait-on-retry` is enabled by default.
+
+Two additional features are provided for instrumentation: 
+
 - `profiling` - add event counters to transactions and expose
   `profile_atomically` / `profile_atomically_with_err`.
 - `bench` - expose manual transaction initialization and commit helpers used by
-  this repository's benchmarks.
-
-Only `wait-on-retry` is enabled by default.
+  the repository's benchmarks.
 
 ## Usage
 

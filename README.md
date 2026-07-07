@@ -3,7 +3,7 @@
 This repository is a Rust workspace for Software Transactional Memory (STM) implementations.
 
 STM provides a composable alternative to regular synchronization mechanisms for concurrent
-operations; It is based on two primiti`ves: transactions and transactional variables.
+operations; It is based on two primitives: transactions and transactional variables.
 
 Users who wish to familiarize themselves with the mechanism can skim through the following
 documents:

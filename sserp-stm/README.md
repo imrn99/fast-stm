@@ -32,17 +32,22 @@ never committing on panic.
 
 ## Features
 
-The following features are available:
+This crate exposes features that can tweak implementation behavior:
 
 - `wait-on-retry` - enabled by default. If `retry` is called explicitly in a
   transaction, the thread waits for one of the variables read in the initial
   transaction to change before attempting the computation again.
+- `hash-registers` - NOT YET IMPLEMENTED
+
+Only `wait-on-retry` is enabled by default.
+
+Two additional features are provided for instrumentation: 
+  
 - `profiling` - add event counters to transactions and expose
   `profile_atomically` / `profile_atomically_with_err`.
 - `bench` - expose manual transaction initialization and commit helpers used by
   the repository's benchmarks.
 
-Only `wait-on-retry` is enabled by default.
 
 ## Usage
 
