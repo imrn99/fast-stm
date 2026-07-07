@@ -9,7 +9,7 @@ Users who wish to familiarize themselves with the mechanism can skim through the
 documents:
 
 - Dedicated STM chapter of [_Real World Haskell_](https://wiki.haskell.org/Real_World_Haskell) for
-  an quick intuitive introduction
+  a quick intuitive introduction
 - [_Software Transactional Memory_, Shavit et al., 1997](https://doi.org/10.1007/s004460050028)
 - [_On the correctness of transactional memory_, Guerraoui et al., 2008](https://dl.acm.org/doi/10.1145/1345206.1345233)
 
