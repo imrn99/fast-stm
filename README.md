@@ -1,131 +1,62 @@
-# Fast Software Transactional Memory
+# rust-stm
 
-This crate is a fork of Marthog's original [`stm` crate](https://github.com/Marthog/rust-stm).
+This repository is a Rust workspace for Software Transactional Memory (STM) implementations.
 
-There are two reasons for this fork to exist:
+STM lets code compose concurrent operations by running them inside transactions. The transaction
+records reads and writes to `TVar`s, commits all writes atomically when the observed state is still
+valid, and retries otherwise.
 
-1. the original crate hasn't been updated in years
-2. there (probably) is some work to do on this crate performance-wise
+## Workspace structure
 
-That being said, the original API should not see significant changes. Below is the original crate's README.
+- [`fast-stm`](fast-stm/) - performance-focused STM implementation forked from Marthog's original
+  [`stm` crate](https://github.com/Marthog/rust-stm).
+- [`sserp-stm`](sserp-stm/) - STM implementation using the SSER+ algorithm from _Boosting
+  transactional memory with stricter serializability_.
+- [`benches`](benches/) - internal Criterion benchmark harness used to compare STM implementations
+  and synchronization primitives.
 
----
+Each published crate has its own README:
 
+- [`fast-stm/README.md`](fast-stm/README.md)
+- [`sserp-stm/README.md`](sserp-stm/README.md)
 
-This library implements [software transactional memory](https://en.wikipedia.org/wiki/Software_transactional_memory),
-often abbreviated with STM.
+## Development
 
-It is designed closely to haskells STM library. Read Simon Marlow's
-[Parallel and Concurrent Programming in Haskell](http://shop.oreilly.com/product/0636920026365.do)
-for more info. Especially the chapter about [Performance](http://shop.oreilly.com/product/0636920026365.do#chapters)
-is also important for using STM in rust.
+Run the published crates' test suites:
 
-With locks the sequential composition of two 
-threadsafe actions is no longer threadsafe because
-other threads may interfere in between of these actions.
-Applying a third lock to protect both may lead to common sources of errors
-like deadlocks or race conditions.
-
-Unlike locks Software transactional memory is composable.
-It is typically implemented by writing all read and write
-operations in a log. When the action has finished and
-all the used `TVar`s are consistend, the writes are commited as
-a single atomic operation.
-Otherwise the computation repeats. This may lead to starvation,
-but avoids common sources of bugs.
-
-Panicing within STM does not poison the `TVar`s. STM ensures consistency by
-never committing on panic.
-
-# Usage
-
-You should only use the functions that are safe to use.
-
-Don't have side effects except for the atomic variables, from this library.
-Especially a mutex or other blocking mechanisms inside of software transactional
-memory is dangerous.
-
-You can run the top-level atomic operation by calling `atomically`.
-
-
-```rust
-use stm::atomically;
-atomically(|trans| {
-    // some action
-    // return value as `Result`, for example
-    Ok(42)
-});
+```sh
+cargo test -p fast-stm -p sserp-stm
 ```
 
-Calls to `atomically` should not be nested.
+Build package documentation:
 
-For running an atomic operation inside of another, pass a mutable reference to a `Transaction`
-and call `try!` on the result or use `?`. You should not handle the error yourself, because it
-breaks consistency.
-
-```rust
-use stm::{atomically, TVar};
-let var = TVar::new(0);
-
-let x = atomically(|trans| {
-    var.write(trans, 42)?; // Pass failure to parent.
-    var.read(trans) // Return the value saved in var.
-});
-
-println!("var = {}", x);
-
+```sh
+cargo doc --workspace --no-deps
 ```
 
-# STM safety
+Run benchmarks for one STM implementation at a time:
 
-> [!WARNING]
-> This implementation does not guarantee opacity. Live transactions can observe
-> inconsistent intermediate states. This has to be accounted for when writing
-> transactional code segments. For more details on opacity, see
-> [On the Correctness of Transactional Memory](https://infoscience.epfl.ch/server/api/core/bitstreams/9f16872d-7c62-4a6f-bdb9-21df82549c71/content).
+```sh
+cargo bench --features fast-stm
+cargo bench --features sserp-stm
+```
 
-Software transactional memory is completely safe in the terms,
-that Rust considers safe. Still there are multiple rules that
-you should obey when dealing with software transactional memory:
-
-* Don't run code with side effects, especially no IO-code,
-  because stm repeats the computation when it detects inconsistent state.
-  Return a closure if you have to.
-* Don't handle the error types yourself, unless you absolutely know what you
-  are doing. Use `Transaction::or`, to combine alternative paths. Always call `try!` or
-  `?` and never ignore a `StmResult`.
-* Don't run `atomically` inside of another. `atomically` is designed to have side effects
-  and will therefore break stm's assumptions. Nested calls are detected at runtime and
-  handled with panic.
-  When you use STM in the inner of a function, then
-  express it in the public interface, by taking `&mut Transaction` as parameter and 
-  returning `StmResult<T>`. Callers can safely compose it into
-  larger blocks.
-* Don't mix locks and transactions. Your code will easily deadlock or slow
-  down unpredictably.
-* Don't use inner mutability to change the content of a `TVar`.
-
-# Speed
-
-Generally keep your atomic blocks as small as possible, because
-the more time you spend, the more likely it is to collide with
-other threads. For STM, reading `TVar`s is quite slow, because it
-needs to look them up in the log every time.
-Every used `TVar` increases the chance of collisions. Therefore you should
-keep the amount of accessed variables as low as needed.
+The benchmark crate requires exactly one of the `fast-stm` or `sserp-stm` features.
 
 ## License
 
-Licensed under either of
+Licensed under either of:
 
- * Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or http://www.apache.org/licenses/LICENSE-2.0)
- * MIT license ([LICENSE-MIT](LICENSE-MIT) or http://opensource.org/licenses/MIT)
+- Apache License, Version 2.0, ([LICENSE-APACHE](LICENSE-APACHE) or
+  http://www.apache.org/licenses/LICENSE-2.0)
+- MIT license ([LICENSE-MIT](LICENSE-MIT) or
+  http://opensource.org/licenses/MIT)
 
 at your option.
 
-### Contribution
+## Contribution
 
-Unless you explicitly state otherwise, any contribution intentionally
-submitted for inclusion in the work by you, as defined in the Apache-2.0
-license, shall be dual licensed as above, without any additional terms or
-conditions.
+Contributions are welcome and accepted as pull requests on [GitHub][GH]. Feel free to use issues to
+report bugs, missing documentation or suggest improvements of the project.
+
+[GH]: https://github.com/imrn99/fast-stm
