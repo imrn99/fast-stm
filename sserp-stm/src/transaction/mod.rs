@@ -128,7 +128,7 @@ impl Default for Transaction {
 
 impl Drop for Transaction {
     fn drop(&mut self) {
-        self.unlock_writes();
+        self.release_writes();
     }
 }
 
@@ -402,7 +402,7 @@ impl Transaction {
         }
 
         let (value, timestamp) = ctrl.load_version();
-        if ctrl.is_locked_by_other(self.id) {
+        if ctrl.is_acquired_by_other(self.id) {
             return Err(StmError::Failure);
         }
 
@@ -439,7 +439,7 @@ impl Transaction {
         self.tallies.n_write.fetch_add(1, Ordering::Relaxed);
 
         let ctrl = var.control_block().clone();
-        self.lock_and_extend(&ctrl)?;
+        self.acquire_and_extend(&ctrl)?;
         self.writes.insert(
             ctrl,
             WriteEntry {
@@ -483,7 +483,7 @@ impl Transaction {
             Err(StmError::Retry) => {
                 let first_reads = std::mem::replace(&mut self.reads, reads_before);
                 let first_writes = std::mem::replace(&mut self.writes, writes_before);
-                self.unlock_write_set(first_writes);
+                self.release_write_set(first_writes);
 
                 let second_result = second(self);
                 if !matches!(second_result, Err(StmError::Failure)) {
@@ -504,14 +504,14 @@ impl Transaction {
         }
     }
 
-    fn lock_and_extend(&mut self, ctrl: &Arc<VarControlBlock>) -> StmClosureResult<()> {
-        if !ctrl.try_lock_for(self.id) {
+    fn acquire_and_extend(&mut self, ctrl: &Arc<VarControlBlock>) -> StmClosureResult<()> {
+        if !ctrl.try_acquire_for(self.id) {
             return Err(StmError::Failure);
         }
 
         let (_, timestamp) = ctrl.load_version();
         if timestamp > self.clock && !self.extend(timestamp) {
-            ctrl.unlock_for(self.id);
+            ctrl.release_from(self.id);
             return Err(StmError::Failure);
         }
 
@@ -525,7 +525,7 @@ impl Transaction {
             }
 
             let (_, current_timestamp) = ctrl.load_version();
-            if ctrl.is_locked_by_other(self.id) || current_timestamp != read.timestamp {
+            if ctrl.is_acquired_by_other(self.id) || current_timestamp != read.timestamp {
                 return false;
             }
         }
@@ -547,19 +547,19 @@ impl Transaction {
     }
 
     fn clear(&mut self) {
-        self.unlock_writes();
+        self.release_writes();
         self.reads.clear();
         self.writes.clear();
     }
 
-    fn unlock_writes(&mut self) {
+    fn release_writes(&mut self) {
         let writes = std::mem::take(&mut self.writes);
-        self.unlock_write_set(writes);
+        self.release_write_set(writes);
     }
 
-    fn unlock_write_set(&self, writes: WriteSet) {
+    fn release_write_set(&self, writes: WriteSet) {
         for (ctrl, _) in writes {
-            ctrl.unlock_for(self.id);
+            ctrl.release_from(self.id);
         }
     }
 
@@ -589,7 +589,7 @@ impl Transaction {
 
     pub(crate) fn commit(&mut self) -> bool {
         if !self.extend(self.clock) {
-            self.unlock_writes();
+            self.release_writes();
             return false;
         }
 
@@ -609,7 +609,7 @@ impl Transaction {
             }
         }
 
-        self.unlock_writes();
+        self.release_writes();
         self.reads.clear();
         true
     }

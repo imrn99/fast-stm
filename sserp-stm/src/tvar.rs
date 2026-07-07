@@ -78,12 +78,12 @@ impl VarControlBlock {
         state.value = value;
     }
 
-    pub fn is_locked_by_other(&self, tx_id: u64) -> bool {
+    pub fn is_acquired_by_other(&self, tx_id: u64) -> bool {
         let owner = self.owner.load(Ordering::Acquire);
         owner != 0 && owner != tx_id
     }
 
-    pub fn try_lock_for(&self, tx_id: u64) -> bool {
+    pub fn try_acquire_for(&self, tx_id: u64) -> bool {
         match self
             .owner
             .compare_exchange(0, tx_id, Ordering::AcqRel, Ordering::Acquire)
@@ -93,7 +93,7 @@ impl VarControlBlock {
         }
     }
 
-    pub fn unlock_for(&self, tx_id: u64) {
+    pub fn release_from(&self, tx_id: u64) {
         let _ = self
             .owner
             .compare_exchange(tx_id, 0, Ordering::AcqRel, Ordering::Acquire);
