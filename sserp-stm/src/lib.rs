@@ -132,6 +132,41 @@
 //!
 //! </div>
 
+// Some note on how the content of the paper is implemented in practice.
+//
+// This crate implements the routines described in Algorithm 1 from
+// _Boosting Transactional Memory with Stricter Serializability_, Sutra et al., 2018,
+// https://doi.org/10.1007/978-3-319-92408-3_11
+//
+// ## Variant
+//
+// The implementation uses the disjoint-access parallel variant discussed in
+// Section 3.5. Process clocks are not read or advanced; transaction-local clocks are still
+// used to avoid validating the snapshot on every read.
+//
+// ## Pseudocode Mapping
+//
+// - `loc(x)` maps to `VarControlBlock::state`, a `parking_lot::RwLock<Version>`
+//   protecting the current type-erased `(value, timestamp)`.
+//   This adapts the paper's atomic location to Rust ownership because values are
+//   stored as type-erased `Arc` payloads.
+// - `lock(x)`, `isLocked(x)`, and `unlock(x)` map to `VarControlBlock::owner`, an atomic
+//   transaction id.
+// - `clock(T)` maps to `Transaction::clock`.
+// - `rs(T)` maps to `Transaction::reads`, keyed by `TVar` identity and storing observed
+//   timestamps.
+// - `ws(T)` maps to `Transaction::writes`, keyed by `TVar` identity and storing deferred
+//   type-erased values.
+// - `extend(T, t)` maps to `Transaction::extend`, which validates non-obsolete reads and
+//   advances the transaction clock.
+// - `commit(T)` maps to `Transaction::commit`, which validates, advances the transaction
+//   clock for write transactions, publishes all deferred writes with one timestamp, wakes
+//   retry waiters, and unlocks written variables.
+//
+// `Transaction::or` marks reads from a retried first branch as obsolete. They are retained
+// for `wait-on-retry` wakeups but skipped by snapshot validation, matching the existing
+// `fast-stm` branch-composition semantics.
+
 #![allow(unexpected_cfgs)]
 #![cfg_attr(nightly, feature(doc_cfg))]
 #![warn(clippy::pedantic)]
