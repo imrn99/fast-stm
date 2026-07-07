@@ -10,6 +10,7 @@ categories.workspace = true
 keywords.workspace = true
 description.workspace = true
 authors = ["Isaie Muron <github@imrn.fr>"]
+publish = false
 
 [features]
 fast-stm = ["dep:fast-stm", "fast-stm/bench"]
