@@ -1,0 +1,26 @@
+[package]
+name = "sserp-stm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+readme.workspace = true
+categories.workspace = true
+keywords.workspace = true
+description = "SSER+ implementation of software transactional memory."
+authors.workspace = true
+
+[features]
+default = ["wait-on-retry"]
+
+wait-on-retry = []
+bench = []
+profiling = []
+
+[dependencies]
+parking_lot = { workspace = true }
+thiserror = { workspace = true }
+
+[build-dependencies]
+rustversion.workspace = true

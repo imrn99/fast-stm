@@ -24,7 +24,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@nightly
       - name: Generate documentation
         run: |
-          cargo +nightly doc -p fast-stm --all-features --no-deps
+          cargo +nightly doc -p fast-stm -p sserp-stm --all-features --no-deps
           sh ./docs/build.sh
       - name: Deploy Docs
         if: github.event_name == 'push'

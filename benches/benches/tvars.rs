@@ -1,7 +1,7 @@
 use std::hint::black_box;
 
+use benches::stm::{init_transaction, TVar};
 use criterion::{criterion_group, criterion_main, Criterion};
-use fast_stm::{init_transaction, TVar};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy)]

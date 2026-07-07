@@ -11,8 +11,15 @@ keywords.workspace = true
 description.workspace = true
 authors = ["Isaie Muron <github@imrn.fr>"]
 
+[features]
+fast-stm = ["dep:fast-stm", "fast-stm/bench"]
+sserp-stm = ["dep:sserp-stm", "sserp-stm/bench"]
+
+[dependencies]
+fast-stm = { workspace = true, optional = true }
+sserp-stm = { workspace = true, optional = true }
+
 [dev-dependencies]
-fast-stm = { workspace = true, features = ["bench"] }
 criterion.workspace = true
 
 [[bench]]
@@ -34,4 +41,3 @@ harness = false
 name = "transaction-struct"
 path = "benches/transactions.rs"
 harness = false
-

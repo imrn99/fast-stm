@@ -1,8 +1,8 @@
+use benches::stm::{commit_transaction, init_transaction, TVar};
 use criterion::{
     criterion_group, criterion_main, AxisScale, BenchmarkId, Criterion, PlotConfiguration,
     Throughput,
 };
-use fast_stm::{commit_transaction, init_transaction, TVar};
 
 /// Transaction commit routine benchmarks
 pub fn criterion_benchmark(c: &mut Criterion) {

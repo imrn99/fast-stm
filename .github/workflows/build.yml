@@ -11,10 +11,11 @@ env:
 
 jobs:
   build_crates:
-    name: Build crate for ${{ matrix.os }} (${{ matrix.feats }})
+    name: Build `${{ matrix.backend }}` for ${{ matrix.os }} (${{ matrix.feats }})
     strategy:
       matrix:
         os: [ ubuntu-latest, macos-latest, windows-latest ]
+        backend: [ fast-stm, sserp-stm ]
         feats: [ --all-features, --no-default-features ]
     runs-on: ${{ matrix.os }}
     steps:
@@ -23,12 +24,13 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --all-targets -p fast-stm ${{ matrix.feats }}
+      - run: cargo build --all-targets -p ${{ matrix.backend }} ${{ matrix.feats }}
   build_benches:
-    name: Build benchmarks (${{ matrix.feats }})
+    name: Build benchmarks (`${{ matrix.backend }}`, ${{ matrix.feats }})
     strategy:
       matrix:
-        feats: [ --all-features, --no-default-features ]
+        backend: [ fast-stm, sserp-stm ]
+        # feats: [ --all-features, --no-default-features ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -36,4 +38,4 @@ jobs:
           submodules: recursive
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --all-targets -p benches ${{ matrix.feats }}
+      - run: cargo build --all-targets -p benches --features ${{ matrix.backend }} # ${{ matrix.feats }}
