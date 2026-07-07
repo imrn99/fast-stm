@@ -598,7 +598,7 @@ impl Transaction {
             let commit_timestamp = self.clock;
 
             for (ctrl, write) in &self.writes {
-                let mut state = ctrl.state.lock();
+                let mut state = ctrl.state.write();
                 state.value = write.value.clone();
                 state.timestamp = commit_timestamp;
             }

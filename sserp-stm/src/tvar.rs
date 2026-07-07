@@ -1,6 +1,6 @@
 #[cfg(feature = "wait-on-retry")]
 use parking_lot::Mutex;
-use parking_lot::Mutex as ParkingMutex;
+use parking_lot::RwLock;
 use std::any::Any;
 use std::cmp;
 use std::fmt::{self, Debug};
@@ -28,7 +28,7 @@ pub struct VarControlBlock {
     waiting_threads: Mutex<Vec<Weak<ControlBlock>>>,
     #[cfg(feature = "wait-on-retry")]
     dead_threads: AtomicUsize,
-    pub state: ParkingMutex<Version>,
+    pub state: RwLock<Version>,
     pub owner: AtomicU64,
 }
 
@@ -41,7 +41,7 @@ impl VarControlBlock {
         Arc::new(VarControlBlock {
             waiting_threads: Mutex::new(Vec::new()),
             dead_threads: AtomicUsize::new(0),
-            state: ParkingMutex::new(Version {
+            state: RwLock::new(Version {
                 value: Arc::new(val),
                 timestamp: 0,
             }),
@@ -55,7 +55,7 @@ impl VarControlBlock {
         T: Any + Sync + Send,
     {
         Arc::new(VarControlBlock {
-            state: ParkingMutex::new(Version {
+            state: RwLock::new(Version {
                 value: Arc::new(val),
                 timestamp: 0,
             }),
@@ -68,8 +68,14 @@ impl VarControlBlock {
     }
 
     pub fn load_version(&self) -> (ArcAny, u64) {
-        let guard = self.state.lock();
+        let guard = self.state.read();
         (guard.value.clone(), guard.timestamp)
+    }
+
+    pub fn write_atomic(&self, value: ArcAny) {
+        let mut state = self.state.write();
+        state.timestamp = state.timestamp.saturating_add(1);
+        state.value = value;
     }
 
     pub fn is_locked_by_other(&self, tx_id: u64) -> bool {
@@ -169,11 +175,7 @@ where
     }
 
     pub fn write_atomic(&self, value: T) {
-        {
-            let mut state = self.control_block.state.lock();
-            state.timestamp = state.timestamp.saturating_add(1);
-            state.value = Arc::new(value);
-        }
+        self.control_block.write_atomic(Arc::new(value));
 
         #[cfg(feature = "wait-on-retry")]
         self.control_block.wake_all();

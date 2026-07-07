@@ -15,7 +15,10 @@ used to avoid validating the snapshot on every read.
 
 ## Pseudocode Mapping
 
-- `loc(x)` maps to `VarControlBlock::state`, a mutex-protected `(value, timestamp)`.
+- `loc(x)` maps to `VarControlBlock::state`, a `parking_lot::RwLock<Version>`
+  protecting the current type-erased `(value, timestamp)`.
+  This adapts the paper's atomic location to Rust ownership because values are
+  stored as type-erased `Arc` payloads.
 - `lock(x)`, `isLocked(x)`, and `unlock(x)` map to `VarControlBlock::owner`, an atomic
   transaction id.
 - `clock(T)` maps to `Transaction::clock`.
