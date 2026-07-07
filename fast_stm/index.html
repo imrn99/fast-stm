@@ -1,0 +1,126 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="fast-stm"><title>fast_stm - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2"href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-1ed95124.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="fast_stm" data-themes="" data-resource-suffix="" data-rustdoc-version="1.99.0-nightly (c4af71034 2026-07-06)" data-channel="nightly" data-search-js="search-9944d736.js" data-stringdex-js="stringdex-2da4960a.js" data-settings-js="settings-170eb4bf.js" ><script src="../static.files/storage-41dd4d93.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-417ebf0a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-f7c3ffd8.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-eab170b8.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><a class="skip-main-content" href="#main-content">Skip to main content</a><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><rustdoc-topbar><h2><a href="#">Crate fast_stm</a></h2></rustdoc-topbar><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../fast_stm/index.html">fast_<wbr>stm</a><span class="version">0.7.1</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#fast-stm" title="fast-stm">fast-stm</a><ul><li><a href="#stm" title="STM">STM</a></li><li><a href="#features" title="Features">Features</a></li><li><a href="#usage" title="Usage">Usage</a></li><li><a href="#stm-safety" title="STM safety">STM safety</a></li><li><a href="#speed" title="Speed">Speed</a></li><li><a href="#profiling" title="Profiling">Profiling</a></li></ul></li></ul><h3><a href="#macros">Crate Items</a></h3><ul class="block"><li><a href="#macros" title="Macros">Macros</a></li><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#enums" title="Enums">Enums</a></li><li><a href="#functions" title="Functions">Functions</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer" title="Drag to resize sidebar"></div><main><div class="width-limiter"><section id="main-content" class="content" tabindex="-1"><div class="main-heading"><h1>Crate <span>fast_<wbr>stm</span>&nbsp;<button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/fast_stm/lib.rs.html#1-564">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="fast-stm"><a class="doc-anchor" href="#fast-stm">§</a>fast-stm</h2>
+<p><code>fast-stm</code> is a performance-focused implementation of
+<a href="https://en.wikipedia.org/wiki/Software_transactional_memory">Software Transactional Memory</a>
+for Rust.</p>
+<p>This crate is a fork of Marthog’s original <a href="https://github.com/Marthog/rust-stm"><code>stm</code> crate</a>. The
+fork exists because the original crate has not been updated in years and there is still performance
+work to do. The original API should not see significant changes.</p>
+<p>The crate is designed closely to Haskell’s STM library. Read Simon Marlow’s
+<a href="http://shop.oreilly.com/product/0636920026365.do">Parallel and Concurrent Programming in Haskell</a>
+for more info. Especially the chapter about
+<a href="http://shop.oreilly.com/product/0636920026365.do#chapters">Performance</a> is
+also important for using STM in Rust.</p>
+<h3 id="stm"><a class="doc-anchor" href="#stm">§</a>STM</h3>
+<p>Users who wish to familiarize themselves with the mechanism can skim through the following
+documents:</p>
+<ul>
+<li>Dedicated STM chapter of <a href="https://wiki.haskell.org/Real_World_Haskell"><em>Real World Haskell</em></a> for
+a quick intuitive introduction</li>
+<li><a href="https://doi.org/10.1007/s004460050028"><em>Software Transactional Memory</em>, Shavit et al., 1997</a></li>
+<li><a href="https://dl.acm.org/doi/10.1145/1345206.1345233"><em>On the correctness of transactional memory</em>, Guerraoui et al., 2008</a></li>
+</ul>
+<p>With locks, the sequential composition of two threadsafe actions is no longer
+threadsafe because other threads may interfere between those actions. Applying a
+third lock to protect both may lead to common sources of errors like deadlocks
+or race conditions.</p>
+<p>Unlike locks, software transactional memory is composable. It is typically
+implemented by writing all read and write operations in a log. When the action
+has finished and all the used <code>TVar</code>s are consistent, the writes are committed
+as a single atomic operation. Otherwise the computation repeats. This may lead
+to starvation, but avoids common sources of bugs.</p>
+<p>Panicking within STM does not poison the <code>TVar</code>s. STM ensures consistency by
+never committing on panic.</p>
+<h3 id="features"><a class="doc-anchor" href="#features">§</a>Features</h3>
+<p>This crate exposes features that can tweak implementation behavior:</p>
+<ul>
+<li><code>wait-on-retry</code> - enabled by default. If <code>retry</code> is called explicitly in a
+transaction, the thread waits for one of the variables read in the initial
+transaction to change before attempting the computation again.</li>
+<li><code>early-conflict-detection</code> - when reading a variable that was already read in
+a transaction, check whether it changed before the commit routine.</li>
+<li><code>hash-registers</code> - use <code>HashMap</code>-based internal read and write registers
+backed by <code>rustc-hash</code> instead of <code>BTreeMap</code> registers.</li>
+</ul>
+<p>Only <code>wait-on-retry</code> is enabled by default.</p>
+<p>Two additional features are provided for instrumentation:</p>
+<ul>
+<li><code>profiling</code> - add event counters to transactions and expose
+<code>profile_atomically</code> / <code>profile_atomically_with_err</code>.</li>
+<li><code>bench</code> - expose manual transaction initialization and commit helpers used by
+the repository’s benchmarks.</li>
+</ul>
+<h3 id="usage"><a class="doc-anchor" href="#usage">§</a>Usage</h3>
+<p>You should only use the functions that are safe to use.</p>
+<p>Do not have side effects except for the atomic variables from this library.
+Especially a mutex or other blocking mechanisms inside software transactional
+memory is dangerous.</p>
+<p>You can run the top-level atomic operation by calling <code>atomically</code>.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>fast_stm::atomically;
+
+atomically(|_tx| {
+    <span class="comment">// some action
+    // return value as `Result`, for example
+    </span><span class="prelude-val">Ok</span>(<span class="number">42</span>)
+});</code></pre></div>
+<p>Calls to <code>atomically</code> should not be nested.</p>
+<p>For running an atomic operation inside of another, pass a mutable reference to a
+<code>Transaction</code> and use <code>?</code> on the result. You should not handle the error
+yourself, because it breaks consistency.</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>fast_stm::{atomically, TVar};
+
+<span class="kw">let </span>var = TVar::new(<span class="number">0</span>);
+
+<span class="kw">let </span>x = atomically(|tx| {
+    var.write(tx, <span class="number">42</span>)<span class="question-mark">?</span>;
+    var.read(tx)
+});
+
+<span class="macro">println!</span>(<span class="string">"var = {}"</span>, x);</code></pre></div><h3 id="stm-safety"><a class="doc-anchor" href="#stm-safety">§</a>STM safety</h3>
+<blockquote>
+<p>[!WARNING]
+This implementation does not guarantee opacity. Live transactions can observe
+inconsistent intermediate states. This has to be accounted for when writing
+transactional code segments. For more details on opacity, see
+<a href="https://infoscience.epfl.ch/server/api/core/bitstreams/9f16872d-7c62-4a6f-bdb9-21df82549c71/content">On the Correctness of Transactional Memory</a>.</p>
+</blockquote>
+<p>Software transactional memory is completely safe in the terms that Rust
+considers safe. Still there are multiple rules that you should obey when
+dealing with software transactional memory:</p>
+<ul>
+<li>Do not run code with side effects, especially no IO-code, because STM repeats
+the computation when it detects inconsistent state. Return a closure if you
+have to.</li>
+<li>Do not handle the error types yourself, unless you absolutely know what you
+are doing. Use <code>Transaction::or</code> to combine alternative paths. Always use <code>?</code>
+and never ignore a <code>StmResult</code>.</li>
+<li>Do not run <code>atomically</code> inside of another. <code>atomically</code> is designed to have
+side effects and will therefore break STM’s assumptions. Nested calls are
+detected at runtime and handled with panic. When you use STM in the inner of a
+function, express it in the public interface by taking <code>&amp;mut Transaction</code> as a
+parameter and returning <code>StmResult&lt;T&gt;</code>. Callers can safely compose it into
+larger blocks.</li>
+<li>Do not mix locks and transactions. Your code will easily deadlock or slow
+unpredictably.</li>
+<li>Do not use inner mutability to change the content of a <code>TVar</code>.</li>
+</ul>
+<h3 id="speed"><a class="doc-anchor" href="#speed">§</a>Speed</h3>
+<p>Generally keep your atomic blocks as small as possible, because the more time
+you spend, the more likely it is to collide with other threads. For STM, reading
+<code>TVar</code>s is quite slow, because it needs to look them up in the log every time.
+Every used <code>TVar</code> increases the chance of collisions. Therefore you should keep
+the amount of accessed variables as low as needed.</p>
+<h3 id="profiling"><a class="doc-anchor" href="#profiling">§</a>Profiling</h3>
+<p>The <code>profiling</code> feature can be enabled to add event counters to transaction. Their values can
+be retrieved by passing a reference to <code>TransactionTallies</code> to the new entry functions:
+<code>profile_atomically</code>, …</p>
+<div class="warning">
+<p>Do not use the <code>profiling</code> feature if you are benchmarking execution times. While regular entry
+functions (<code>atomically</code>, <code>atomically_with_err</code>) are still available, they internally implement
+counters without giving public access to their value. This is done to avoid breaking the API
+when the feature is enabled.</p>
+</div></div></details><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><dl class="item-table"><dt><a class="macro" href="macro.try_or_coerce.html" title="macro fast_stm::try_or_coerce">try_<wbr>or_<wbr>coerce</a></dt><dd>Convert a <code>TransactionClosureResult&lt;T, E_A&gt;</code> to <code>TransactionClosureResult&lt;T, E_B&gt;</code>.</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.TVar.html" title="struct fast_stm::TVar">TVar</a></dt><dd>A variable that can be used in a STM-Block</dd><dt><a class="struct" href="struct.Transaction.html" title="struct fast_stm::Transaction">Transaction</a></dt><dd>Transaction tracks all the read and written variables.</dd><dt><a class="struct" href="struct.TransactionTallies.html" title="struct fast_stm::TransactionTallies">Transaction<wbr>Tallies</a><wbr><span class="stab portability" title="Available on crate feature `profiling` only"><code>profiling</code></span></dt></dl><h2 id="enums" class="section-header">Enums<a href="#enums" class="anchor">§</a></h2><dl class="item-table"><dt><a class="enum" href="enum.StmError.html" title="enum fast_stm::StmError">StmError</a></dt><dd>Error of a single step of a transaction.</dd><dt><a class="enum" href="enum.TransactionControl.html" title="enum fast_stm::TransactionControl">Transaction<wbr>Control</a></dt><dt><a class="enum" href="enum.TransactionError.html" title="enum fast_stm::TransactionError">Transaction<wbr>Error</a></dt><dd>Error of a single step of a fallible transaction.</dd><dt><a class="enum" href="enum.TransactionResult.html" title="enum fast_stm::TransactionResult">Transaction<wbr>Result</a></dt><dd>Result of a fallible transaction.</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.abort.html" title="fn fast_stm::abort">abort</a></dt><dd>Call <code>abort</code> to abort a transaction and pass the error as the return value.</dd><dt><a class="fn" href="fn.atomically.html" title="fn fast_stm::atomically">atomically</a></dt><dd>Run a function atomically by using Software Transactional Memory.
+It calls to <code>Transaction::with</code> internally, but is more explicit.</dd><dt><a class="fn" href="fn.atomically_with_err.html" title="fn fast_stm::atomically_with_err">atomically_<wbr>with_<wbr>err</a></dt><dd>Run a function atomically by using Software Transactional Memory.
+It calls to <code>Transaction::with_err</code> internally, but is more explicit.</dd><dt><a class="fn" href="fn.commit_transaction.html" title="fn fast_stm::commit_transaction">commit_<wbr>transaction</a><wbr><span class="stab portability" title="Available on crate feature `bench` only"><code>bench</code></span></dt><dt><a class="fn" href="fn.guard.html" title="fn fast_stm::guard">guard</a></dt><dd>Retry until <code>cond</code> is true.</dd><dt><a class="fn" href="fn.init_transaction.html" title="fn fast_stm::init_transaction">init_<wbr>transaction</a><wbr><span class="stab portability" title="Available on crate feature `bench` only"><code>bench</code></span></dt><dt><a class="fn" href="fn.optionally.html" title="fn fast_stm::optionally">optionally</a></dt><dd>Optionally run a transaction <code>f</code>. If <code>f</code> fails with a <code>retry()</code>, it does
+not cancel the whole transaction, but returns <code>None</code>.</dd><dt><a class="fn" href="fn.retry.html" title="fn fast_stm::retry">retry</a></dt><dd>Call <code>retry</code> to abort an operation and run the whole transaction again.</dd><dt><a class="fn" href="fn.unwrap_or_abort.html" title="fn fast_stm::unwrap_or_abort">unwrap_<wbr>or_<wbr>abort</a></dt><dd>Unwrap <code>Option</code> or call abort if it is <code>None</code>.</dd><dt><a class="fn" href="fn.unwrap_or_retry.html" title="fn fast_stm::unwrap_or_retry">unwrap_<wbr>or_<wbr>retry</a></dt><dd>Unwrap <code>Option</code> or call retry if it is <code>None</code>.</dd></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.StmClosureResult.html" title="type fast_stm::StmClosureResult">StmClosure<wbr>Result</a></dt><dd>Return type of a transaction body.</dd><dt><a class="type" href="type.TransactionClosureResult.html" title="type fast_stm::TransactionClosureResult">Transaction<wbr>Closure<wbr>Result</a></dt><dd>Return type of a fallible transaction body.</dd></dl></section></div></main></body></html>
