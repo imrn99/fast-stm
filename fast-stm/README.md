@@ -1,19 +1,28 @@
 # fast-stm
 
 `fast-stm` is a performance-focused implementation of
-[software transactional memory](https://en.wikipedia.org/wiki/Software_transactional_memory)
-for Rust, often abbreviated with STM.
+[Software Transactional Memory](https://en.wikipedia.org/wiki/Software_transactional_memory)
+for Rust.
 
-This crate is a fork of Marthog's original
-[`stm` crate](https://github.com/Marthog/rust-stm). The fork exists because the
-original crate has not been updated in years and there is still performance work
-to do. The original API should not see significant changes.
+This crate is a fork of Marthog's original [`stm` crate](https://github.com/Marthog/rust-stm). The
+fork exists because the original crate has not been updated in years and there is still performance
+work to do. The original API should not see significant changes.
 
-It is designed closely to Haskell's STM library. Read Simon Marlow's
+The crate is designed closely to Haskell's STM library. Read Simon Marlow's
 [Parallel and Concurrent Programming in Haskell](http://shop.oreilly.com/product/0636920026365.do)
 for more info. Especially the chapter about
 [Performance](http://shop.oreilly.com/product/0636920026365.do#chapters) is
 also important for using STM in Rust.
+
+## STM
+
+Users who wish to familiarize themselves with the mechanism can skim through the following
+documents:
+
+- Dedicated STM chapter of [_Real World Haskell_](https://wiki.haskell.org/Real_World_Haskell) for
+  an quick intuitive introduction
+- [_Software Transactional Memory_, Shavit et al., 1997](https://doi.org/10.1007/s004460050028)
+- [_On the correctness of transactional memory_, Guerraoui et al., 2008](https://dl.acm.org/doi/10.1145/1345206.1345233)
 
 With locks, the sequential composition of two threadsafe actions is no longer
 threadsafe because other threads may interfere between those actions. Applying a

@@ -2,9 +2,16 @@
 
 This repository is a Rust workspace for Software Transactional Memory (STM) implementations.
 
-STM lets code compose concurrent operations by running them inside transactions. The transaction
-records reads and writes to `TVar`s, commits all writes atomically when the observed state is still
-valid, and retries otherwise.
+STM provides a composable alternative to regular synchronization mechanisms for concurrent
+operations; It is based on two primiti`ves: transactions and transactional variables.
+
+Users who wish to familiarize themselves with the mechanism can skim through the following
+documents:
+
+- Dedicated STM chapter of [_Real World Haskell_](https://wiki.haskell.org/Real_World_Haskell) for
+  an quick intuitive introduction
+- [_Software Transactional Memory_, Shavit et al., 1997](https://doi.org/10.1007/s004460050028)
+- [_On the correctness of transactional memory_, Guerraoui et al., 2008](https://dl.acm.org/doi/10.1145/1345206.1345233)
 
 ## Workspace structure
 

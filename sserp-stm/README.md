@@ -6,8 +6,15 @@ using the SSER+ algorithm from
 [Boosting Transactional Memory with Stricter Serializability](https://doi.org/10.1007/978-3-319-92408-3_11)
 by Sutra, Marlier, Schiavoni, and Trahay.
 
-This crate mirrors the public API of `fast-stm`, while using a different STM
-algorithm internally.
+## STM
+
+Users who wish to familiarize themselves with the mechanism can skim through the following
+documents:
+
+- Dedicated STM chapter of [_Real World Haskell_](https://wiki.haskell.org/Real_World_Haskell) for
+  an quick intuitive introduction
+- [_Software Transactional Memory_, Shavit et al., 1997](https://doi.org/10.1007/s004460050028)
+- [_On the correctness of transactional memory_, Guerraoui et al., 2008](https://dl.acm.org/doi/10.1145/1345206.1345233)
 
 With locks, the sequential composition of two threadsafe actions is no longer
 threadsafe because other threads may interfere between those actions. Applying a
